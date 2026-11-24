@@ -144,6 +144,7 @@ test('buildLlmContextPayload produces compact grounded summary without full row 
   const payload = buildLlmContextPayload({
     viewId: 'overview',
     filteredRows: offlineRows,
+    allRows: offlineRows,
     totalLoadedCount: offlineRows.length,
     snapshotSource: 'Midterm snapshot (1,500 rows)',
     filterDescription: 'All records',
@@ -151,7 +152,25 @@ test('buildLlmContextPayload produces compact grounded summary without full row 
   });
 
   assert.equal(payload.kpis.recordCount, 1500);
+  assert.equal(payload.isFiltered, false);
+  assert.equal(payload.overallSummary.totalLoadedCount, 1500);
+  assert.ok(payload.overallSummary.scenarioCounts['1'].count > 0);
   assert.ok(payload.topProducts.length > 0 && payload.topProducts.length <= 12);
   assert.ok(payload.sampleRecords.length <= 8);
   assert.ok(payload.kpis.totalNetSales > 0);
+
+  const emptySlicePayload = buildLlmContextPayload({
+    viewId: 'overview',
+    filteredRows: [],
+    allRows: offlineRows,
+    totalLoadedCount: offlineRows.length,
+    snapshotSource: 'Imported snapshot',
+    filterDescription: 'Query="NONEXISTENT-XYZ"',
+    anomalies: [],
+  });
+  assert.equal(emptySlicePayload.isFiltered, true);
+  assert.equal(emptySlicePayload.kpis.recordCount, 0);
+  assert.equal(emptySlicePayload.kpis.totalNetSales, 0);
+  assert.equal(emptySlicePayload.overallSummary.totalLoadedCount, 1500);
+  assert.ok(emptySlicePayload.overallSummary.totalNetSales > 0);
 });

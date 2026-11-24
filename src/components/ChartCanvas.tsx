@@ -1,21 +1,35 @@
 import { useEffect, useRef } from 'react';
-import Chart, { type ChartConfiguration } from 'chart.js/auto';
+import Chart, { type ChartConfiguration, type Plugin } from 'chart.js/auto';
 
 interface ChartCanvasProps {
+  id?: string;
   config: ChartConfiguration;
-  heightClass?: string;
+  plugins?: Plugin[];
+  containerClassName?: string;
   ariaLabel: string;
+  isLight?: boolean;
   onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
 }
 
 export function ChartCanvas({
+  id,
   config,
-  heightClass = 'h-72',
+  plugins,
+  containerClassName = 'chart-container',
   ariaLabel,
+  isLight = false,
   onCanvasReady,
 }: ChartCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart | null>(null);
+
+  useEffect(() => {
+    Chart.defaults.color = isLight ? '#526783' : '#9aaec9';
+    Chart.defaults.borderColor = isLight ? '#d9e4f2' : '#2a3954';
+    if (chartRef.current) {
+      chartRef.current.update();
+    }
+  }, [isLight]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -27,7 +41,13 @@ export function ChartCanvas({
       chartRef.current = null;
     }
 
-    chartRef.current = new Chart(canvas, config);
+    Chart.defaults.color = isLight ? '#526783' : '#9aaec9';
+    Chart.defaults.borderColor = isLight ? '#d9e4f2' : '#2a3954';
+
+    chartRef.current = new Chart(canvas, {
+      ...config,
+      plugins,
+    });
 
     return () => {
       if (chartRef.current) {
@@ -36,11 +56,11 @@ export function ChartCanvas({
       }
       onCanvasReady?.(null);
     };
-  }, [config, onCanvasReady]);
+  }, [config, plugins, onCanvasReady, isLight]);
 
   return (
-    <div className={`relative w-full ${heightClass}`}>
-      <canvas ref={canvasRef} aria-label={ariaLabel} role="img" />
+    <div className={containerClassName}>
+      <canvas id={id} ref={canvasRef} aria-label={ariaLabel} role="img" />
     </div>
   );
 }

@@ -104,11 +104,33 @@ export type LlmAnalysisTask =
   | 'anomaly-explanation'
   | 'scenario-deep-dive';
 
+export interface LlmOverallSummary {
+  totalLoadedCount: number;
+  totalNetSales: number;
+  totalUnits: number;
+  averageOrderValue: number;
+  dateSpan: string;
+  distinctDates: number;
+  totalAnomalyFlags: number;
+  topProducts: Array<{
+    sku: string;
+    name: string;
+    netSales: number;
+    units: number;
+  }>;
+  scenarioCounts: Record<FocusedQuestionId, { count: number; netSales: number }>;
+}
+
 export interface LlmContextPayload {
   viewId: ScenarioId;
   viewLabel: string;
   snapshotSource: string;
   filterDescription: string;
+  isFiltered: boolean;
+  activeGrouping?: GroupingMode;
+  midtermLoaded?: boolean;
+  midtermLabel?: string;
+  overallSummary: LlmOverallSummary;
   kpis: {
     recordCount: number;
     totalLoadedCount: number;

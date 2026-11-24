@@ -366,24 +366,98 @@ export function detectSalesAnomalies(rows: SalesRecord[]): AnomalyFlag[] {
   );
 }
 
+export function buildOverallSummary(
+  allRows: SalesRecord[],
+  overallAnomalyCount?: number
+): LlmContextPayload['overallSummary'] {
+  const totalLoadedCount = allRows.length;
+  const totalNetSales = metricSum(allRows, 'net_sales_collected');
+  const totalUnits = metricSum(allRows, 'quantity_sold');
+  const averageOrderValue = totalLoadedCount ? totalNetSales / totalLoadedCount : 0;
+  const uniqueDates = [...new Set(allRows.map(dateOf).filter(Boolean))].sort();
+  const dateSpan = uniqueDates.length
+    ? `${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]}`
+    : 'No dated sales';
+
+  const productMap = new Map<
+    string,
+    { sku: string; name: string; netSales: number; units: number }
+  >();
+  for (const row of allRows) {
+    const sku = skuOf(row) || 'Unspecified';
+    const name = productOf(row) || sku;
+    const entry = productMap.get(sku) ?? { sku, name, netSales: 0, units: 0 };
+    entry.netSales += Number(row.net_sales_collected) || 0;
+    entry.units += Number(row.quantity_sold) || 0;
+    productMap.set(sku, entry);
+  }
+
+  const topProducts = [...productMap.values()]
+    .sort((a, b) => b.netSales - a.netSales)
+    .slice(0, 6)
+    .map((p) => ({
+      ...p,
+      netSales: Math.round(p.netSales * 100) / 100,
+    }));
+
+  const scenarioCounts = (['1', '2', '3', '4'] as const).reduce(
+    (acc, q) => {
+      const qRows = filterScenarioRows(allRows, q);
+      acc[q] = {
+        count: qRows.length,
+        netSales: Math.round(metricSum(qRows, 'net_sales_collected') * 100) / 100,
+      };
+      return acc;
+    },
+    {} as Record<FocusedQuestionId, { count: number; netSales: number }>
+  );
+
+  return {
+    totalLoadedCount,
+    totalNetSales: Math.round(totalNetSales * 100) / 100,
+    totalUnits,
+    averageOrderValue: Math.round(averageOrderValue * 100) / 100,
+    dateSpan,
+    distinctDates: uniqueDates.length,
+    totalAnomalyFlags:
+      overallAnomalyCount ?? detectSalesAnomalies(allRows).length,
+    topProducts,
+    scenarioCounts,
+  };
+}
+
 export function buildLlmContextPayload(params: {
   viewId: ScenarioId;
   filteredRows: SalesRecord[];
+  allRows?: SalesRecord[];
   totalLoadedCount: number;
   snapshotSource: string;
   filterDescription: string;
+  activeGrouping?: GroupingMode;
+  midtermLoaded?: boolean;
+  midtermLabel?: string;
+  overallAnomalyCount?: number;
   anomalies?: AnomalyFlag[];
   mlFlags?: IsolationForestFlag[];
 }): LlmContextPayload {
   const {
     viewId,
     filteredRows,
+    allRows,
     totalLoadedCount,
     snapshotSource,
     filterDescription,
+    activeGrouping,
+    midtermLoaded = false,
+    midtermLabel,
+    overallAnomalyCount,
     anomalies = [],
     mlFlags = [],
   } = params;
+
+  const baseRows = allRows ?? filteredRows;
+  const isFiltered = filteredRows.length !== totalLoadedCount || viewId !== 'overview';
+  const overallSummary = buildOverallSummary(baseRows, overallAnomalyCount);
 
   const totalNetSales = metricSum(filteredRows, 'net_sales_collected');
   const totalUnits = metricSum(filteredRows, 'quantity_sold');
@@ -488,6 +562,11 @@ export function buildLlmContextPayload(params: {
     viewLabel: SCENARIO_META[viewId].title,
     snapshotSource,
     filterDescription,
+    isFiltered,
+    activeGrouping,
+    midtermLoaded,
+    midtermLabel,
+    overallSummary,
     kpis: {
       recordCount,
       totalLoadedCount,

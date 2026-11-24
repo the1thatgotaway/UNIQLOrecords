@@ -1,14 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import {
-  BarChart3,
-  Database,
-  Menu,
-  Moon,
-  Printer,
-  Sparkles,
-  Sun,
-  X,
-} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import rawSalesData from './data/offlineSales.json';
 import type {
   FocusedQuestionId,
@@ -29,22 +19,37 @@ import {
   skuOf,
 } from './utils/salesAnalytics.ts';
 import { computeIsolationForest } from './utils/isolationForest.ts';
-import { OverviewDashboard } from './components/OverviewDashboard.tsx';
-import { ScenarioView } from './components/ScenarioView.tsx';
-import { LlmAnalystDrawer } from './components/LlmAnalystDrawer.tsx';
-import { SnapshotImportModal } from './components/SnapshotImportModal.tsx';
+import { parseImportedSnapshot, SUPABASE_SNAPSHOT_SQL } from './utils/snapshotParser.ts';
+import { OverviewSection } from './components/OverviewSection.tsx';
+import { QuestionSection } from './components/QuestionSection.tsx';
+import { GeminiModal } from './components/GeminiModal.tsx';
 
 const INITIAL_ROWS = rawSalesData as SalesRecord[];
-const DEFAULT_SOURCE = 'Nov 20, 2026 Midterm Snapshot';
+const DEFAULT_SOURCE_NAME = 'November 20, 2026 Midterm snapshot';
 
 export default function App() {
-  const [salesRows, setSalesRows] = useState<SalesRecord[]>(INITIAL_ROWS);
-  const [sourceLabel, setSourceLabel] = useState<string>(DEFAULT_SOURCE);
+  const [snapshotRows, setSnapshotRows] = useState<SalesRecord[]>(INITIAL_ROWS);
+  const [sourceName, setSourceName] = useState<string>(DEFAULT_SOURCE_NAME);
   const [activeTab, setActiveTab] = useState<ScenarioId>('overview');
-  const [isDark, setIsDark] = useState<boolean>(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLight, setIsLight] = useState<boolean>(false);
+  const [importMessage, setImportMessage] = useState<string>('');
+  const [loadedAt, setLoadedAt] = useState<string>(() =>
+    new Date().toLocaleTimeString('en-PH')
+  );
 
-  // Overview filter state (lifted so LLM grounding always sees exact active slice)
+  // Refresh / Sync status feedback (matching SYNC ENGINE v4)
+  const [isReloading, setIsReloading] = useState(false);
+  const [refreshNotice, setRefreshNotice] = useState<{
+    message: string;
+    kind: '' | 'warning' | 'error';
+  } | null>(null);
+  const [refreshToast, setRefreshToast] = useState<{
+    title: string;
+    detail: string;
+    kind: '' | 'warning' | 'error';
+  } | null>(null);
+
+  // Overview filter state
   const [search, setSearch] = useState('');
   const [selectedSku, setSelectedSku] = useState('');
   const [fromDate, setFromDate] = useState('');
@@ -52,50 +57,86 @@ export default function App() {
   const [sortOrder, setSortOrder] = useState<OverviewSortOrder>('id-desc');
   const [overviewGroup, setOverviewGroup] = useState<'month' | 'week' | 'day'>('month');
 
-  // Midterm comparison snapshot for Scenarios 01-04
+  // Midterm comparison snapshot
   const [midtermSnapshot, setMidtermSnapshot] = useState<MidtermSnapshot | null>(null);
+  const [midtermFileName, setMidtermFileName] = useState<string>('');
 
-  // Modals & Drawers
-  const [llmOpen, setLlmOpen] = useState(false);
-  const [llmInitialTask, setLlmInitialTask] = useState<LlmAnalysisTask | null>(null);
-  const [importModalOpen, setImportModalOpen] = useState(false);
+  // Non-invasive Gemini AI Copilot / Chatbot
+  const [geminiOpen, setGeminiOpen] = useState(false);
+  const [geminiInitialTask, setGeminiInitialTask] = useState<LlmAnalysisTask | null>(null);
+  const [geminiTriggerNonce, setGeminiTriggerNonce] = useState(0);
+
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark);
-  }, [isDark]);
+    document.body.classList.toggle('light', isLight);
+  }, [isLight]);
 
   const skuChoices = useMemo(
-    () => [...new Set(salesRows.map(skuOf).filter(Boolean))].sort(),
-    [salesRows]
+    () => [...new Set(snapshotRows.map(skuOf).filter(Boolean))].sort(),
+    [snapshotRows]
   );
 
-  const scenarioCounts = useMemo(
+  const scenarioRowsMap = useMemo(
     () => ({
-      overview: salesRows.length,
-      '1': filterScenarioRows(salesRows, '1'),
-      '2': filterScenarioRows(salesRows, '2'),
-      '3': filterScenarioRows(salesRows, '3'),
-      '4': filterScenarioRows(salesRows, '4'),
+      '1': filterScenarioRows(snapshotRows, '1'),
+      '2': filterScenarioRows(snapshotRows, '2'),
+      '3': filterScenarioRows(snapshotRows, '3'),
+      '4': filterScenarioRows(snapshotRows, '4'),
     }),
-    [salesRows]
+    [snapshotRows]
   );
 
   const overviewFilteredRows = useMemo(
     () =>
-      filterAndSortOverview(salesRows, {
+      filterAndSortOverview(snapshotRows, {
         search,
         sku: selectedSku,
         from: fromDate,
         to: toDate,
         sort: sortOrder,
       }),
-    [salesRows, search, selectedSku, fromDate, toDate, sortOrder]
+    [snapshotRows, search, selectedSku, fromDate, toDate, sortOrder]
+  );
+
+  const overallAnomalyCount = useMemo(
+    () => detectSalesAnomalies(snapshotRows).length,
+    [snapshotRows]
   );
 
   const overviewAnomalies = useMemo(
     () => detectSalesAnomalies(overviewFilteredRows),
     [overviewFilteredRows]
   );
+
+  const { statusMessage, statusType, alertMessage } = useMemo(() => {
+    const distinctKeys = new Set(
+      snapshotRows.map((r) => r.date_key).filter((k) => k !== null && k !== undefined)
+    );
+    const oneDate = snapshotRows.length > 1 && distinctKeys.size === 1;
+    const notices: string[] = [];
+    if (oneDate) {
+      notices.push(
+        `DATE QUALITY WARNING: all ${formatNumber(snapshotRows.length)} sales have date_key ${
+          [...distinctKeys][0]
+        }. This comes from the SQL seed, not the chart. Run UNIQLO_Repair_Sales_Dates_2024_to_2026.sql in the Supabase SQL Editor, then reload records. The repair generates labeled synthetic dates, not historical facts.`
+      );
+    }
+    if (!snapshotRows.length) {
+      notices.push(
+        'Supabase returned zero visible sales. Check the stored fact_sales count in the SQL Editor and the read policy for your dashboard role.'
+      );
+    }
+    return {
+      statusMessage: `Loaded ${formatNumber(
+        snapshotRows.length
+      )} sales records from the offline snapshot · ${loadedAt}${
+        oneDate ? ' · Only one distinct date key detected' : ''
+      }`,
+      statusType: (oneDate ? 'warning' : 'success') as '' | 'success' | 'warning' | 'error',
+      alertMessage: notices.join('  '),
+    };
+  }, [snapshotRows, loadedAt]);
 
   const llmContextPayload = useMemo(() => {
     if (activeTab === 'overview') {
@@ -107,14 +148,19 @@ export default function App() {
       return buildLlmContextPayload({
         viewId: 'overview',
         filteredRows: overviewFilteredRows,
-        totalLoadedCount: salesRows.length,
-        snapshotSource: sourceLabel,
-        filterDescription: parts.length ? parts.join(' · ') : 'All loaded transactions (unfiltered)',
+        allRows: snapshotRows,
+        totalLoadedCount: snapshotRows.length,
+        snapshotSource: `Offline · ${sourceName}`,
+        filterDescription: parts.length ? parts.join(' · ') : 'All loaded transactions',
+        activeGrouping: overviewGroup,
+        midtermLoaded: Boolean(midtermSnapshot),
+        midtermLabel: midtermFileName || undefined,
+        overallAnomalyCount,
         anomalies: overviewAnomalies,
       });
     }
 
-    const qRows = scenarioCounts[activeTab];
+    const qRows = scenarioRowsMap[activeTab];
     const bucketsMap = groupSales(qRows, 'day');
     const sortedBuckets = [...bucketsMap.keys()]
       .sort()
@@ -125,9 +171,14 @@ export default function App() {
     return buildLlmContextPayload({
       viewId: activeTab,
       filteredRows: qRows,
-      totalLoadedCount: salesRows.length,
-      snapshotSource: sourceLabel,
+      allRows: snapshotRows,
+      totalLoadedCount: snapshotRows.length,
+      snapshotSource: `Offline · ${sourceName}`,
       filterDescription: SCENARIO_META[activeTab].subtitle,
+      activeGrouping: 'day',
+      midtermLoaded: Boolean(midtermSnapshot),
+      midtermLabel: midtermFileName || undefined,
+      overallAnomalyCount,
       anomalies: qAnomalies,
       mlFlags: mlModel.flags,
     });
@@ -138,290 +189,313 @@ export default function App() {
     toDate,
     search,
     overviewFilteredRows,
-    salesRows.length,
-    sourceLabel,
+    snapshotRows,
+    sourceName,
+    overviewGroup,
+    midtermSnapshot,
+    midtermFileName,
+    overallAnomalyCount,
     overviewAnomalies,
-    scenarioCounts,
+    scenarioRowsMap,
   ]);
 
+  const handleReloadSnapshot = () => {
+    if (isReloading) return;
+    setIsReloading(true);
+    const nowTime = new Date().toLocaleTimeString('en-PH');
+    setLoadedAt(nowTime);
+    const msg = `Reloaded ${formatNumber(snapshotRows.length)} records from Offline · ${sourceName} (${nowTime}).`;
+    setRefreshNotice({ message: msg, kind: '' });
+    setRefreshToast({
+      title: 'Snapshot synchronized',
+      detail: msg,
+      kind: '',
+    });
+    setTimeout(() => setIsReloading(false), 180);
+  };
+
+  const handleOfflineImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const parsed = parseImportedSnapshot(await file.text());
+      setSnapshotRows(parsed.rows);
+      setSourceName(file.name);
+      setLoadedAt(new Date().toLocaleTimeString('en-PH'));
+      setImportMessage(`${parsed.count} records loaded.`);
+      setActiveTab('overview');
+    } catch (err) {
+      setImportMessage(err instanceof Error ? err.message : 'Unable to import snapshot.');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
   const openGemini = (task: LlmAnalysisTask | null = null) => {
-    setLlmInitialTask(task);
-    setLlmOpen(true);
+    setGeminiInitialTask(task);
+    setGeminiTriggerNonce((n) => n + 1);
+    setGeminiOpen(true);
   };
 
-  const handleSelectTab = (tab: ScenarioId) => {
-    setActiveTab(tab);
-    setMobileMenuOpen(false);
-  };
+  const tabOrder: ScenarioId[] = ['overview', '1', '2', '3', '4'];
 
-  const navItems: Array<{ id: ScenarioId; count: number }> = [
-    { id: 'overview', count: scenarioCounts.overview },
-    { id: '1', count: scenarioCounts['1'].length },
-    { id: '2', count: scenarioCounts['2'].length },
-    { id: '3', count: scenarioCounts['3'].length },
-    { id: '4', count: scenarioCounts['4'].length },
-  ];
+  const handleTabsKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const currentIdx = tabOrder.indexOf(activeTab);
+    const nextIdx =
+      (currentIdx + (e.key === 'ArrowRight' ? 1 : -1) + tabOrder.length) % tabOrder.length;
+    setActiveTab(tabOrder[nextIdx]);
+    tabRefs.current[nextIdx]?.focus();
+    e.preventDefault();
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0B111A] dark:text-slate-100">
-      <div className="flex min-h-screen">
-        {/* Desktop Sidebar */}
-        <aside className="no-print hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex dark:border-slate-800 dark:bg-[#0D131D]">
-          <div className="border-b border-slate-200 px-4 py-4 dark:border-slate-800">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-red-600 font-display text-sm font-extrabold text-white">
-                U
-              </div>
-              <div className="min-w-0">
-                <div className="truncate font-display text-sm font-bold text-slate-900 dark:text-white">
-                  UNIQLO Analytics
-                </div>
-                <div className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-                  Sales &amp; Gemini AI
-                </div>
-              </div>
+    <>
+      <header>
+        <div className="header-inner">
+          <div>
+            <div className="brand">
+              <span className="brand-mark">U</span> UNIQLO / SALES MANAGEMENT
+            </div>
+            <h1>
+              UNIQLO <span>Sales Management Records</span>
+            </h1>
+            <p>Sales records, visual analytics, and retail performance insights</p>
+          </div>
+          <div className="header-actions">
+            <span className="online">SUPABASE DATA CONNECTION</span>
+            <button
+              id="geminiTrigger"
+              className="head-btn"
+              type="button"
+              onClick={() => openGemini(null)}
+            >
+              ✦ Gemini AI
+            </button>
+            <button
+              id="printReport"
+              className="head-btn"
+              type="button"
+              onClick={() => window.print()}
+            >
+              ▤ Print report
+            </button>
+            <button
+              id="themeToggle"
+              className="head-btn"
+              type="button"
+              onClick={() => setIsLight((l) => !l)}
+            >
+              {isLight ? '☾ Dark mode' : '☀ Light mode'}
+            </button>
+            <div className="refresh-control-group">
+              <button
+                id="refreshData"
+                className="head-btn"
+                type="button"
+                title="Reload the selected snapshot"
+                disabled={isReloading}
+                onClick={handleReloadSnapshot}
+              >
+                {isReloading ? '⟳ Syncing…' : '↻ Reload snapshot'}
+              </button>
+              <span className="refresh-build">SYNC ENGINE v4</span>
             </div>
           </div>
-
-          <nav className="flex-1 space-y-1 p-3" aria-label="Sales analytics views">
-            <div className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Analytical Views
-            </div>
-            {navItems.map(({ id, count }) => {
-              const meta = SCENARIO_META[id];
-              const isActive = activeTab === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => handleSelectTab(id)}
-                  className={`flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-xs transition ${
-                    isActive
-                      ? 'bg-slate-900 font-semibold text-white dark:bg-lime-400/15 dark:text-lime-300 dark:ring-1 dark:ring-lime-400/35'
-                      : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60'
-                  }`}
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="font-mono text-[11px] opacity-70">{meta.code}</span>
-                    <span className="truncate">{meta.shortTitle}</span>
-                  </span>
-                  <span className="font-mono text-[11px] tabular-nums opacity-75">
-                    {formatNumber(count)}
-                  </span>
-                </button>
-              );
-            })}
-
-            <div className="pt-4">
-              <div className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Workspace Tools
-              </div>
-              <button
-                type="button"
-                onClick={() => openGemini('executive-briefing')}
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium text-sky-700 transition hover:bg-sky-50 dark:text-lime-300 dark:hover:bg-lime-950/30"
-              >
-                <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">Gemini AI Copilot</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setImportModalOpen(true)}
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium text-slate-700 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60"
-              >
-                <Database className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">Import Snapshot</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium text-slate-700 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60"
-              >
-                <Printer className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">Print Active Report</span>
-              </button>
-            </div>
-          </nav>
-
-          <div className="border-t border-slate-200 p-3 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
-            <div className="font-semibold text-slate-700 dark:text-slate-300">Active Dataset</div>
-            <div className="mt-0.5 truncate">{sourceLabel}</div>
-            <div className="mt-0.5 font-mono tabular-nums">
-              {formatNumber(salesRows.length)} records loaded
-            </div>
-          </div>
-        </aside>
-
-        {/* Mobile Slide-Over Sidebar */}
-        {mobileMenuOpen && (
-          <div className="no-print fixed inset-0 z-40 flex lg:hidden">
-            <div
-              className="fixed inset-0 bg-slate-950/60"
-              onClick={() => setMobileMenuOpen(false)}
-            />
-            <div className="relative z-10 flex w-72 max-w-[85vw] flex-col border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-[#0D131D]">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-3 dark:border-slate-800">
-                <div className="flex items-center gap-2 font-display text-sm font-bold">
-                  <BarChart3 className="h-4 w-4 text-red-600" />
-                  <span>UNIQLO Analytics</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setMobileMenuOpen(false)}
-                  aria-label="Close navigation"
-                  className="rounded p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="mt-3 space-y-1">
-                {navItems.map(({ id, count }) => {
-                  const meta = SCENARIO_META[id];
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => handleSelectTab(id)}
-                      className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-xs ${
-                        activeTab === id
-                          ? 'bg-slate-900 font-semibold text-white dark:bg-lime-400/15 dark:text-lime-300'
-                          : 'text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      <span>
-                        {meta.code} · {meta.shortTitle}
-                      </span>
-                      <span className="font-mono tabular-nums">{formatNumber(count)}</span>
-                    </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    setImportModalOpen(true);
-                  }}
-                  className="mt-3 flex w-full items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-xs font-medium dark:border-slate-700"
-                >
-                  <Database className="h-3.5 w-3.5" />
-                  <span>Import Snapshot</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Main Viewport */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* Top Bar Contract: Breadcrumb Left + Max 2 Primary Actions Right */}
-          <header className="no-print sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-xs sm:px-6 dark:border-slate-800 dark:bg-[#0D131D]/95">
-            <div className="flex min-w-0 items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(true)}
-                aria-label="Open navigation menu"
-                className="rounded-md border border-slate-300 p-1.5 text-slate-700 lg:hidden dark:border-slate-700 dark:text-slate-200"
-              >
-                <Menu className="h-4 w-4" />
-              </button>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
-                  <span>UNIQLO Sales</span>
-                  <span>/</span>
-                  <span className="font-semibold text-slate-900 dark:text-white">
-                    {SCENARIO_META[activeTab].shortTitle}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={() => openGemini(null)}
-                className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800 dark:bg-lime-400 dark:text-slate-950 dark:hover:bg-lime-300"
-              >
-                <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                <span>Ask Gemini AI</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsDark((d) => !d)}
-                aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-                className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-[#111824] dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-                <span className="hidden sm:inline">{isDark ? 'Light' : 'Dark'}</span>
-              </button>
-            </div>
-          </header>
-
-          <main className="mx-auto w-full max-w-[1380px] flex-1 p-4 sm:p-6">
-            {activeTab === 'overview' ? (
-              <OverviewDashboard
-                allRows={salesRows}
-                filteredRows={overviewFilteredRows}
-                anomalies={overviewAnomalies}
-                skuChoices={skuChoices}
-                search={search}
-                selectedSku={selectedSku}
-                fromDate={fromDate}
-                toDate={toDate}
-                sortOrder={sortOrder}
-                grouping={overviewGroup}
-                isDark={isDark}
-                onSearchChange={setSearch}
-                onSkuChange={setSelectedSku}
-                onFromDateChange={setFromDate}
-                onToDateChange={setToDate}
-                onSortOrderChange={setSortOrder}
-                onGroupingChange={setOverviewGroup}
-                onClearFilters={() => {
-                  setSearch('');
-                  setSelectedSku('');
-                  setFromDate('');
-                  setToDate('');
-                  setSortOrder('id-desc');
-                  setOverviewGroup('month');
-                }}
-                onOpenGemini={(task) => openGemini(task)}
-              />
-            ) : (
-              <ScenarioView
-                questionId={activeTab as FocusedQuestionId}
-                scenarioRows={scenarioCounts[activeTab]}
-                midtermSnapshot={midtermSnapshot}
-                isDark={isDark}
-                onMidtermLoaded={(snap) => setMidtermSnapshot(snap)}
-                onAskGeminiScenario={() => openGemini('scenario-deep-dive')}
-              />
-            )}
-          </main>
         </div>
+      </header>
+
+      <div
+        id="refreshFeedback"
+        className={`refresh-feedback${refreshToast ? (refreshToast.kind ? ` ${refreshToast.kind}` : '') : ' hidden'}`}
+        role="status"
+        aria-live="polite"
+      >
+        <div className="refresh-feedback-copy">
+          <strong id="refreshFeedbackTitle">{refreshToast?.title ?? 'Synchronizing'}</strong>
+          <span id="refreshFeedbackDetail" className="feedback-details">
+            {refreshToast?.detail ?? ''}
+          </span>
+        </div>
+        <button
+          id="refreshFeedbackClose"
+          className="feedback-dismiss"
+          type="button"
+          aria-label="Dismiss message"
+          onClick={() => setRefreshToast(null)}
+        >
+          ×
+        </button>
       </div>
 
-      <LlmAnalystDrawer
-        isOpen={llmOpen}
-        initialTask={llmInitialTask}
-        contextPayload={llmContextPayload}
-        onClose={() => setLlmOpen(false)}
-      />
+      <main>
+        <div className="section-label">
+          SALES ANALYTICS <span className="module-count">05 VIEWS</span>
+        </div>
+        <p className="sales-analytics-description">
+          Explore sales records and trends across pricing, customer behavior, store performance, and
+          promotions through interactive dashboards.
+        </p>
 
-      <SnapshotImportModal
-        isOpen={importModalOpen}
-        currentSourceLabel={sourceLabel}
-        currentCount={salesRows.length}
-        onClose={() => setImportModalOpen(false)}
-        onImportRows={(rows, fileName) => {
-          setSalesRows(rows);
-          setSourceLabel(fileName);
-        }}
-        onResetDefault={() => {
-          setSalesRows(INITIAL_ROWS);
-          setSourceLabel(DEFAULT_SOURCE);
-        }}
+        <section className="card">
+          <strong id="sourceName">{`Offline · ${sourceName}`}</strong>
+          <details>
+            <summary>Load newer sales from Supabase</summary>
+            <p>
+              Run the query below in the project SQL Editor. Export its single result as CSV and
+              choose that file here.
+            </p>
+            <pre id="exportQuery">{SUPABASE_SNAPSHOT_SQL}</pre>
+            <input
+              id="offlineImport"
+              type="file"
+              accept=".csv,.json"
+              onChange={handleOfflineImport}
+            />
+            <p role="status" id="importMessage">
+              {importMessage}
+            </p>
+          </details>
+        </section>
+
+        <nav className="tabs" aria-label="Dashboard sections" onKeyDown={handleTabsKeyDown}>
+          <button
+            ref={(el) => {
+              tabRefs.current[0] = el;
+            }}
+            className={`tab overview-tab${activeTab === 'overview' ? ' active' : ''}`}
+            id="tabOverview"
+            type="button"
+            aria-controls="overview"
+            aria-selected={activeTab === 'overview'}
+            onClick={() => setActiveTab('overview')}
+          >
+            ◫ &nbsp; All Sales Dashboard <span className="tab-index">00</span>
+          </button>
+          <button
+            ref={(el) => {
+              tabRefs.current[1] = el;
+            }}
+            className={`tab${activeTab === '1' ? ' active' : ''}`}
+            id="tab1"
+            type="button"
+            aria-selected={activeTab === '1'}
+            onClick={() => setActiveTab('1')}
+          >
+            ◈ &nbsp; Premium Pricing <span className="tab-index">01</span>
+          </button>
+          <button
+            ref={(el) => {
+              tabRefs.current[2] = el;
+            }}
+            className={`tab${activeTab === '2' ? ' active' : ''}`}
+            id="tab2"
+            type="button"
+            aria-selected={activeTab === '2'}
+            onClick={() => setActiveTab('2')}
+          >
+            ◎ &nbsp; Customer Behavior <span className="tab-index">02</span>
+          </button>
+          <button
+            ref={(el) => {
+              tabRefs.current[3] = el;
+            }}
+            className={`tab${activeTab === '3' ? ' active' : ''}`}
+            id="tab3"
+            type="button"
+            aria-selected={activeTab === '3'}
+            onClick={() => setActiveTab('3')}
+          >
+            ▥ &nbsp; Store Performance <span className="tab-index">03</span>
+          </button>
+          <button
+            ref={(el) => {
+              tabRefs.current[4] = el;
+            }}
+            className={`tab${activeTab === '4' ? ' active' : ''}`}
+            id="tab4"
+            type="button"
+            aria-selected={activeTab === '4'}
+            onClick={() => setActiveTab('4')}
+          >
+            ✦ &nbsp; Promo Analytics <span className="tab-index">04</span>
+          </button>
+        </nav>
+
+        <div
+          id="refreshNotice"
+          className={`refresh-notice${refreshNotice ? (refreshNotice.kind ? ` ${refreshNotice.kind}` : '') : ' hidden'}`}
+          role="status"
+          aria-live="polite"
+        >
+          {refreshNotice?.message ?? ''}
+        </div>
+
+        {activeTab === 'overview' ? (
+          <OverviewSection
+            allRows={snapshotRows}
+            filteredRows={overviewFilteredRows}
+            anomalies={overviewAnomalies}
+            skuChoices={skuChoices}
+            search={search}
+            selectedSku={selectedSku}
+            fromDate={fromDate}
+            toDate={toDate}
+            sortOrder={sortOrder}
+            grouping={overviewGroup}
+            isLight={isLight}
+            statusMessage={statusMessage}
+            statusType={statusType}
+            alertMessage={alertMessage}
+            isReloading={isReloading}
+            onSearchChange={setSearch}
+            onSkuChange={setSelectedSku}
+            onFromDateChange={setFromDate}
+            onToDateChange={setToDate}
+            onSortOrderChange={setSortOrder}
+            onGroupingChange={setOverviewGroup}
+            onClearFilters={() => {
+              setSearch('');
+              setSelectedSku('');
+              setFromDate('');
+              setToDate('');
+              setSortOrder('id-desc');
+              setOverviewGroup('month');
+            }}
+            onReloadRecords={handleReloadSnapshot}
+            onOpenGemini={(task) => openGemini(task)}
+          />
+        ) : (
+          <QuestionSection
+            key={activeTab}
+            questionId={activeTab as FocusedQuestionId}
+            rows={scenarioRowsMap[activeTab as FocusedQuestionId]}
+            midtermSnapshot={midtermSnapshot}
+            totalOverviewCount={snapshotRows.length}
+            isLight={isLight}
+            statusTime={loadedAt}
+            midtermStatusLabel={midtermFileName ? `Loaded ${midtermFileName}` : ''}
+            onMidtermLoaded={(snap, fname) => {
+              setMidtermSnapshot(snap);
+              setMidtermFileName(fname);
+            }}
+            onOpenGemini={(task) => openGemini(task)}
+          />
+        )}
+
+        <div className="footer">
+          UNIQLO SALES MANAGEMENT RECORDS • Live results depend on Supabase access
+        </div>
+      </main>
+
+      <GeminiModal
+        isOpen={geminiOpen}
+        initialTask={geminiInitialTask}
+        triggerNonce={geminiTriggerNonce}
+        contextPayload={llmContextPayload}
+        onOpen={() => openGemini(null)}
+        onClose={() => setGeminiOpen(false)}
       />
-    </div>
+    </>
   );
 }
