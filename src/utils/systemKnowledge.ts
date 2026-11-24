@@ -104,11 +104,11 @@ export const SYSTEM_KNOWLEDGE_SECTIONS: Record<KnowledgeSectionId, string> = {
 - Simulated Dates Caveat: Companion SQL repair ("UNIQLO_Repair_Sales_Dates_2024_to_2026.sql") distributed synthetic dates between January 1, 2024 and September 26, 2026 (inclusive). Monthly/daily spikes reflect statistical distribution in those synthetic dates, not verified real-world historical events.
 - Active Filter vs Overall Dataset: Always check both active filtered KPIs and overall loaded KPIs before answering so filtered subset counts are never confused with total loaded snapshot counts.`,
 
-  copilot: `GEMINI AI COPILOT CAPABILITIES & PRIVACY:
-- Accessible via the bottom-right floating chatbot launcher button, the top-right "✦ Gemini AI" button, or inline "✦ Explain flags with Gemini" / "✦ Ask Gemini AI" buttons inside cards.
+  copilot: `UNIQLO SALES ASSISTANT CAPABILITIES & PRIVACY:
+- Accessible via the bottom-right "Sales Assistant" launcher button, the top-right "✦ Gemini AI" button, or inline "✦ Explain flags with Gemini" / "✦ Ask Gemini AI" buttons inside cards.
 - Supports two integrated workflows:
-  1. Conversational Chat Assistant: Multi-turn SSE-streaming Q&A in English, Filipino, or Taglish with conversation memory, suggested questions, Minimize/Reopen/Close controls, and Clear Chat.
-  2. Structured Briefings: "✦ Executive Briefing", "✦ Explain Anomalies & ML", and "✦ Deep-Dive Slice" return schema-validated JSON insights grounded in the active view.
+  1. Chat: Multi-turn SSE-streaming Q&A in English, Filipino, or Taglish with persistent conversation history, suggested questions, Minimize/Reopen/Close controls, and Clear.
+  2. Briefings: "✦ Executive Briefing", "✦ Explain Anomalies & ML", and "✦ Deep-Dive Slice" return schema-validated JSON insights grounded in the active view.
 - Security & Read-Only Boundary: All Gemini API calls run exclusively on the Express backend using process.env.GEMINI_API_KEY. Chat responses cannot read external databases directly or modify database tables.`,
 };
 

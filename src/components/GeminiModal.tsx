@@ -278,19 +278,15 @@ export function GeminiModal({
           onClick={handleLauncherClick}
           aria-label={
             userTurnCount > 0
-              ? `Open UNIQLO AI Assistant (${userTurnCount} saved questions)`
-              : 'Open UNIQLO AI Assistant'
+              ? `Open UNIQLO Sales Assistant (${userTurnCount} saved questions)`
+              : 'Open UNIQLO Sales Assistant'
           }
         >
           <span className="chatbot-launcher-mark" aria-hidden="true">
             ✦
           </span>
           <span className="chatbot-launcher-label">
-            {minimized && userTurnCount > 0
-              ? `AI Assistant (${userTurnCount})`
-              : userTurnCount > 0
-                ? `Ask AI Assistant (${userTurnCount})`
-                : 'Ask AI Assistant'}
+            {userTurnCount > 0 ? `Sales Assistant (${userTurnCount})` : 'Sales Assistant'}
           </span>
         </button>
       )}
@@ -304,8 +300,8 @@ export function GeminiModal({
         >
           <div className="llm-modal-header">
             <div className="llm-header-copy">
-              <div className="ai-eyebrow">UNIQLO AI COPILOT · SYSTEM &amp; DATA GUIDE</div>
-              <h2 id="llmModalTitle">UNIQLO Virtual Assistant</h2>
+              <div className="ai-eyebrow">SALES ANALYTICS GUIDE</div>
+              <h2 id="llmModalTitle">UNIQLO Sales Assistant</h2>
               <p className="llm-scope-line">
                 {contextPayload.viewLabel} ·{' '}
                 {contextPayload.isFiltered
@@ -335,7 +331,7 @@ export function GeminiModal({
                 className="llm-icon-btn"
                 onClick={handleMinimize}
                 title="Minimize chat"
-                aria-label="Minimize AI assistant"
+                aria-label="Minimize Sales Assistant"
               >
                 —
               </button>
@@ -345,14 +341,14 @@ export function GeminiModal({
                 className="llm-icon-btn"
                 onClick={handleClose}
                 title="Close chat"
-                aria-label="Close Gemini AI panel"
+                aria-label="Close Sales Assistant"
               >
                 ✕
               </button>
             </div>
           </div>
 
-          <div className="chatbot-mode-bar" role="tablist" aria-label="AI Copilot Modes">
+          <div className="chatbot-mode-bar" role="tablist" aria-label="Sales Assistant Modes">
             <button
               type="button"
               role="tab"
@@ -363,7 +359,7 @@ export function GeminiModal({
                 setMode('chat');
               }}
             >
-              Chat Assistant
+              Chat
             </button>
             <button
               type="button"
@@ -375,7 +371,7 @@ export function GeminiModal({
                 setMode('briefing');
               }}
             >
-              Structured Briefings
+              Briefings
             </button>
             <button
               type="button"
@@ -490,23 +486,21 @@ export function GeminiModal({
               <>
                 <div className="llm-welcome-card">
                   <div className="llm-welcome-head">
-                    <span className="llm-msg-role">VIRTUAL SYSTEM GUIDE &amp; ANALYST</span>
+                    <span className="llm-msg-role">SYSTEM &amp; DATA GUIDE</span>
                     {messages.length > 0 && (
                       <span className="chatbot-saved-note">History saved</span>
                     )}
                   </div>
                   <p>
-                    Welcome! Ask me anything about navigating the <strong>UNIQLO Sales
-                    Analytics</strong> platform, importing snapshots, understanding{' '}
-                    <strong>IQR alerts</strong> or <strong>Isolation Forest ML</strong>, or
-                    analyzing sales performance in <strong>English, Filipino, or Taglish</strong>.
+                    Ask about navigating dashboards, importing snapshots, <strong>IQR</strong> or{' '}
+                    <strong>Isolation Forest</strong> alerts, or sales trends in{' '}
+                    <strong>English, Filipino, or Taglish</strong>.
                   </p>
                   <div className="llm-welcome-meta">
                     Active view: <strong>{contextPayload.viewLabel}</strong> ({formatNumber(
                       contextPayload.kpis.recordCount
                     )}{' '}
-                    shown / {formatNumber(contextPayload.overallSummary.totalLoadedCount)} total
-                    loaded)
+                    shown / {formatNumber(contextPayload.overallSummary.totalLoadedCount)} total)
                   </div>
                 </div>
 
@@ -545,11 +539,11 @@ export function GeminiModal({
                     return (
                       <div key={i} className={`llm-msg ${msg.role}`}>
                         <div className="llm-msg-role">
-                          {msg.role === 'user' ? 'You' : 'UNIQLO AI Assistant'}
+                          {msg.role === 'user' ? 'You' : 'Sales Assistant'}
                           {msg.timestamp ? ` · ${msg.timestamp}` : ''}
                         </div>
                         {isTyping ? (
-                          <div className="chatbot-typing" aria-label="Assistant is typing">
+                          <div className="chatbot-typing" aria-label="Sales Assistant is typing">
                             <span className="typing-dot" />
                             <span className="typing-dot" />
                             <span className="typing-dot" />
@@ -594,11 +588,11 @@ export function GeminiModal({
               <input
                 ref={inputRef}
                 type="text"
-                placeholder="Ask in English, Filipino, or Taglish…"
+                placeholder="Ask about sales, charts, or features…"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={streaming}
-                aria-label="Ask UNIQLO AI Assistant a question"
+                aria-label="Ask UNIQLO Sales Assistant a question"
               />
               <button
                 type="submit"
