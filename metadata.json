@@ -1,0 +1,8 @@
+{
+  "name": "UNIQLO Sales Analytics & Gemini AI",
+  "description": "Full-stack retail sales analytics workbench with Isolation Forest anomaly detection, statistical IQR audits, and server-side Gemini LLM intelligence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
