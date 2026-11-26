@@ -354,7 +354,7 @@ function Dashboard() {
               <span className="brand-mark">U</span> SALES ANALYTICS
             </div>
             <h1>
-              <span>UniQlick</span>
+              <span>UniQlick - LifeWear</span>
             </h1>
             <p>One Click. Every Sale. Complete Control.</p>
           </div>
