@@ -356,12 +356,12 @@ export function OverviewSection({
 
   return (
     <section id="overview" aria-labelledby="overviewHeading">
-      <div className="full-dash-title">
+      <div className="card full-dash-title overview-intro">
         <div>
-          <span className="overview-eyebrow">UniQlick / SALES DATABASE</span>
-          <h2 id="overviewHeading">Executive Dashboard</h2>
+          <span className="overview-eyebrow">Executive Dashboard</span>
+          <h2 id="overviewHeading">UniQlick Retail Sales Analytics</h2>
           <p>
-            UniQlick brings retail sales records and analysis together. Track performance across products, stores, and promotions, then use the underlying transactions to investigate what changed.
+            Use <strong>UniQlick</strong> to see what sold, where it sold, and which promotions were applied. The dashboard links Supabase transactions to products, customers, stores, and employees, so you can trace changes in sales back to the records behind them.
           </p>
         </div>
         <div className="full-dash-actions">

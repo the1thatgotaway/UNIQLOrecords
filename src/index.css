@@ -1130,3 +1130,11 @@ body.light .overview-hero .overview-eyebrow { color: #ffb2bb; }
 .warehouse-dimensions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 850px) { .warehouse-dimensions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .warehouse-dimensions { grid-template-columns: 1fr; } }
+
+.full-dash-title.overview-intro { align-items: flex-start; padding: clamp(18px, 3vw, 36px); }
+.overview-intro h2 { font-weight: 800; margin-block: 10px 14px; }
+.overview-intro p { max-width: 76ch; font-size: clamp(14px, 1.2vw, 17px); line-height: 1.7; }
+.overview-intro .overview-eyebrow::before {
+  content: ''; display: inline-block; width: 7px; height: 7px;
+  margin-inline-end: 8px; border-radius: 50%; background: currentColor;
+}
