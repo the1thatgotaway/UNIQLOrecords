@@ -66,9 +66,10 @@ export default function App() {
 
 function Dashboard() {
   const [snapshotRows, setSnapshotRows] = useState<SalesRecord[]>([]);
-  const [activeTab, setActiveTab] = useState<ScenarioId | 'comparison' | 'mining' | 'schema'>(() => {
+  const [schemaOpen, setSchemaOpen] = useState(() => new URLSearchParams(window.location.search).get('view') === 'schema');
+  const [activeTab, setActiveTab] = useState<ScenarioId | 'comparison' | 'mining'>(() => {
     const view = new URLSearchParams(window.location.search).get('view');
-    return view === 'comparison' || view === 'schema' ? view : 'overview';
+    return view === 'comparison' ? view : 'overview';
   });
   const [miningQuestion, setMiningQuestion] = useState<FocusedQuestionId>('3');
   const [isLight, setIsLight] = useState<boolean>(true);
@@ -173,7 +174,7 @@ function Dashboard() {
   }, [snapshotRows, loadedAt, sourceName]);
 
   const llmContextPayload = useMemo(() => {
-    if (activeTab === 'overview' || activeTab === 'comparison' || activeTab === 'schema') {
+    if (activeTab === 'overview' || activeTab === 'comparison') {
       const parts: string[] = [];
       if (selectedSku) parts.push(`SKU=${selectedSku}`);
       if (fromDate || toDate) parts.push(`Dates=${fromDate || 'start'}..${toDate || 'end'}`);
@@ -287,9 +288,10 @@ function Dashboard() {
   };
 
   const focusedQuestion = activeTab === 'mining' ? miningQuestion : activeTab as FocusedQuestionId;
-  const tabOrder: (ScenarioId | 'comparison' | 'mining' | 'schema')[] = ['overview', '1', '2', '3', '4', 'comparison', 'schema'];
+  const tabOrder: (ScenarioId | 'comparison' | 'mining')[] = ['overview', '1', '2', '3', '4', 'comparison'];
 
   const handleTabsKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.target instanceof HTMLElement && e.target.closest('[aria-haspopup="dialog"]')) return;
     const next = e.key === 'ArrowRight' || e.key === 'ArrowDown';
     const previous = e.key === 'ArrowLeft' || e.key === 'ArrowUp';
     if (!next && !previous) return;
@@ -439,9 +441,9 @@ function Dashboard() {
               aria-selected={activeTab === 'comparison'} onClick={() => setActiveTab('comparison')}>
               <Columns2 size={17} aria-hidden="true" /><span>Comparative Analysis</span>
             </button>
-            <button type="button" ref={el => { tabRefs.current[6] = el; }}
-              className={activeTab === 'schema' ? 'tab active' : 'tab'}
-              aria-selected={activeTab === 'schema'} onClick={() => setActiveTab('schema')}>
+            <button type="button"
+              className="tab"
+              aria-haspopup="dialog" onClick={() => setSchemaOpen(true)}>
               <Database size={17} aria-hidden="true" /><span>Warehouse Schema</span>
             </button>
           </nav>
@@ -488,8 +490,8 @@ function Dashboard() {
           </div>
 
           {!loadedAt && isReloading && <p role="status">Loading sales from Supabase…</p>}
-          {activeTab === 'schema' && <WarehouseSchema />}
-          {loadedAt && activeTab !== 'schema' && (activeTab === 'comparison' ? <MidtermComparison midtermSnapshot={midtermSnapshot} midterm={midtermRows} finals={snapshotRows} isLight={isLight} salesTiming={salesTiming} isReloading={isReloading} onReloadRecords={handleReloadRecords} statusTime={loadedAt} onOpenGemini={openGemini} /> : activeTab === 'overview' ? (
+          {schemaOpen && <WarehouseSchema onClose={() => setSchemaOpen(false)} />}
+          {loadedAt && (activeTab === 'comparison' ? <MidtermComparison midtermSnapshot={midtermSnapshot} midterm={midtermRows} finals={snapshotRows} isLight={isLight} salesTiming={salesTiming} isReloading={isReloading} onReloadRecords={handleReloadRecords} statusTime={loadedAt} onOpenGemini={openGemini} /> : activeTab === 'overview' ? (
             <OverviewSection
               allRows={snapshotRows}
               filteredRows={overviewFilteredRows}

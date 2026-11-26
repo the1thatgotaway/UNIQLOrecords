@@ -1070,3 +1070,19 @@ body.light .overview-hero .overview-eyebrow { color: #ffb2bb; }
 .warehouse-fields { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 12px 0 0; }
 .warehouse-fields li { font-size: 12px; padding: 4px 7px; border-radius: 5px; border: 1px solid var(--line); background: var(--panel2); overflow-wrap: anywhere; }
 .warehouse-fields strong, .warehouse-fields a { color: var(--accent); }
+
+.warehouse-dialog {
+  position: fixed; inset: 0; margin: auto; padding: 0; width: min(1040px, 94vw);
+  max-height: 90dvh; overflow: auto; border: 1px solid var(--line); border-radius: 16px;
+  background: var(--panel); color: var(--text);
+}
+.warehouse-dialog::backdrop { background: rgb(20 10 12 / 52%); backdrop-filter: blur(5px); }
+.warehouse-dialog-heading, .warehouse-dialog-footer {
+  position: sticky; z-index: 1; display: flex; align-items: center; gap: 12px;
+  padding: 12px clamp(14px, 3vw, 28px); background: var(--panel2);
+}
+.warehouse-dialog-heading { top: 0; border-bottom: 1px solid var(--line); }
+.warehouse-dialog-heading h2 { flex: 1; margin: 0; font-size: clamp(16px, 2vw, 22px); }
+.warehouse-dialog-footer { bottom: 0; justify-content: flex-end; border-top: 1px solid var(--line); }
+.warehouse-dialog-body { padding: clamp(14px, 3vw, 28px); }
+.warehouse-diagram { display: block; margin: 0 auto 20px; width: min(100%, 840px); height: auto; border-radius: 10px; }

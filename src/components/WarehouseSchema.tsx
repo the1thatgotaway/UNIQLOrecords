@@ -1,4 +1,5 @@
-import { Database, Link2 } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { Database, Link2, X } from 'lucide-react';
 
 const dimensions = [
   { name: 'dim_date', key: 'date_key', grain: 'One row per calendar day', fields: ['full_date', 'day_of_week', 'day_of_month', 'month_name', 'quarter_of_year', 'year_number', 'is_weekend', 'fiscal_quarter', 'retail_season'] },
@@ -9,10 +10,20 @@ const dimensions = [
   { name: 'dim_promotion', key: 'promotion_key', grain: 'One row per promotion', fields: ['promo_code', 'promotion_name', 'discount_type', 'marketing_channel', 'is_app_exclusive'] },
 ];
 
-export function WarehouseSchema() {
+export function WarehouseSchema({ onClose }: { onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => { dialog.current?.showModal(); }, []);
+
   return (
-    <section className="warehouse-schema" aria-labelledby="warehouse-title">
-      <h2 id="warehouse-title">Data Warehouse Schema</h2>
+    <dialog ref={dialog} onClose={onClose} className="warehouse-dialog warehouse-schema" aria-labelledby="warehouse-title">
+      <div className="warehouse-dialog-heading">
+        <Database size={24} aria-hidden="true" />
+        <h2 id="warehouse-title">UniQlick Data Warehouse Schema</h2>
+        <button type="button" className="action-btn" aria-label="Close schema" onClick={() => dialog.current?.close()}><X size={18} /></button>
+      </div>
+      <div className="warehouse-dialog-body">
+      <img className="warehouse-diagram" src="/assets/warehouse-schema.png" alt="Star schema showing fact_sales linked to the date, product, store, employee, customer, and promotion dimensions" />
+      <h3>Warehouse tables</h3>
       <p>Six dimension tables describe each sale in <code>public.fact_sales</code>. Each foreign key links to the matching dimension’s primary key.</p>
       <article className="card warehouse-fact">
         <h3><Database size={19} aria-hidden="true" /> <code>fact_sales</code></h3>
@@ -36,6 +47,10 @@ export function WarehouseSchema() {
           </article>
         ))}
       </div>
-    </section>
+      </div>
+      <div className="warehouse-dialog-footer">
+        <button type="button" className="action-btn" onClick={() => dialog.current?.close()}>Close</button>
+      </div>
+    </dialog>
   );
 }
