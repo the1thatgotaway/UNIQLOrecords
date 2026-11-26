@@ -22,31 +22,31 @@ export function WarehouseSchema({ onClose }: { onClose: () => void }) {
         <button type="button" className="action-btn" aria-label="Close schema" onClick={() => dialog.current?.close()}><X size={18} /></button>
       </div>
       <div className="warehouse-dialog-body">
-      <img className="warehouse-diagram" src="/assets/warehouse-schema.png" alt="Star schema showing fact_sales linked to the date, product, store, employee, customer, and promotion dimensions" />
-      <h3>Warehouse tables</h3>
-      <p>Six dimension tables describe each sale in <code>public.fact_sales</code>. Each foreign key links to the matching dimension’s primary key.</p>
-      <article className="card warehouse-fact">
-        <h3><Database size={19} aria-hidden="true" /> <code>fact_sales</code></h3>
-        <p>One row per recorded sale line item.</p>
-        <ul className="warehouse-fields" aria-label="Fact table columns">
-          <li><code>sales_fact_id</code> <strong>PK</strong></li>
-          {dimensions.map(({ key, name }) => <li key={key}><a href={`#warehouse-${name}`}><code>{key}</code> <strong>FK</strong></a></li>)}
-          {['transaction_receipt_number', 'quantity_sold', 'gross_unit_price', 'item_discount_amount', 'tax_amount', 'net_sales_collected'].map(field => <li key={field}><code>{field}</code></li>)}
-        </ul>
-      </article>
-      <div className="warehouse-dimensions">
-        {dimensions.map(({ name, key, grain, fields }) => (
-          <article className="card" key={name} id={`warehouse-${name}`}>
-            <h3><Link2 size={18} aria-hidden="true" /> <code>{name}</code></h3>
-            <p>{grain}</p>
-            <p className="warehouse-join"><code>fact_sales.{key}</code> → <code>{name}.{key}</code></p>
-            <ul className="warehouse-fields" aria-label={`${name} columns`}>
-              <li><code>{key}</code> <strong>PK</strong></li>
-              {fields.map(field => <li key={field}><code>{field}</code></li>)}
-            </ul>
-          </article>
-        ))}
-      </div>
+        <img className="warehouse-diagram" src="/assets/warehouse-schema.png?v=2" width={1160} height={811} alt="Star schema showing fact_sales linked to the date, product, store, employee, customer, and promotion dimensions" />
+        <h3 className="warehouse-tables-title">Warehouse Tables</h3>
+        <p>Six dimension tables describe each sale in <code>public.fact_sales</code>. Each foreign key links to the matching dimension’s primary key.</p>
+        <article className="card warehouse-fact">
+          <h3><Database size={19} aria-hidden="true" /> <code>fact_sales</code><span className="warehouse-table-type">Fact table</span></h3>
+          <p>One row per recorded sale line item.</p>
+          <ul className="warehouse-fields" aria-label="Fact table columns">
+            <li><code>sales_fact_id</code> <strong>PK</strong></li>
+            {dimensions.map(({ key, name }) => <li key={key}><a href={`#warehouse-${name}`}><code>{key}</code> <strong>FK</strong></a></li>)}
+            {['transaction_receipt_number', 'quantity_sold', 'gross_unit_price', 'item_discount_amount', 'tax_amount', 'net_sales_collected'].map(field => <li key={field}><code>{field}</code></li>)}
+          </ul>
+        </article>
+        <div className="warehouse-dimensions">
+          {dimensions.map(({ name, key, grain, fields }) => (
+            <article className="card" key={name} id={`warehouse-${name}`}>
+              <h3><Link2 size={18} aria-hidden="true" /> <code>{name}</code><span className="warehouse-table-type">Dimension</span></h3>
+              <p>{grain}</p>
+              <p className="warehouse-join"><code>fact_sales.{key}</code> → <code>{name}.{key}</code></p>
+              <ul className="warehouse-fields" aria-label={`${name} columns`}>
+                <li><code>{key}</code> <strong>PK</strong></li>
+                {fields.map(field => <li key={field}><code>{field}</code></li>)}
+              </ul>
+            </article>
+          ))}
+        </div>
       </div>
       <div className="warehouse-dialog-footer">
         <button type="button" className="action-btn" onClick={() => dialog.current?.close()}>Close</button>

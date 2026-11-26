@@ -1121,3 +1121,12 @@ body.light .overview-hero .overview-eyebrow { color: #ffb2bb; }
 .llm-scenario-grid .llm-chip { display: grid; gap: 4px; text-align: left; white-space: normal; }
 .llm-scenario-grid span { color: var(--muted); font-weight: 400; }
 @media (max-width: 520px) { .llm-scenario-grid { grid-template-columns: 1fr; } }
+
+.warehouse-dialog-heading h2 { font-family: 'DM Sans', sans-serif; font-weight: 800; line-height: 1.2; }
+.warehouse-tables-title { margin-top: 20px; font-weight: 750; }
+.warehouse-dialog-body article.card { padding: clamp(14px, 2vw, 20px); }
+.warehouse-dialog-body article h3 { flex-wrap: wrap; font-weight: 700; }
+.warehouse-table-type { margin-inline-start: auto; color: var(--accent); font: 600 11px 'DM Sans', sans-serif; }
+.warehouse-dimensions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 850px) { .warehouse-dimensions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .warehouse-dimensions { grid-template-columns: 1fr; } }
