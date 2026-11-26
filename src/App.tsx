@@ -78,6 +78,7 @@ function Dashboard() {
   const [salesTiming, setSalesTiming] = useState<{ requestMs: number; supabaseMs: number | null } | null>(null);
 
   // Refresh / Sync status feedback (matching SYNC ENGINE v4)
+  const [refreshSeconds, setRefreshSeconds] = useState(0);
   const [isReloading, setIsReloading] = useState(true);
   const [refreshNotice, setRefreshNotice] = useState<{
     message: string;
@@ -244,7 +245,7 @@ function Dashboard() {
     scenarioRowsMap,
   ]);
 
-  const loadLiveSales = useCallback(async (signal?: AbortSignal) => {
+  const loadLiveSales = useCallback(async (signal?: AbortSignal, quiet = false) => {
     setIsReloading(true);
     try {
       const requestStarted = performance.now();
@@ -261,7 +262,7 @@ function Dashboard() {
       setSnapshotRows(snapshot.rows);
       setLoadedAt(new Date().toLocaleTimeString('en-PH'));
       setRefreshNotice(null);
-      if (!signal) {
+      if (!signal && !quiet) {
         setRefreshToast({
           title: 'Live sales loaded',
           detail: formatNumber(snapshot.count) + ' records loaded from Supabase.',
@@ -285,6 +286,12 @@ function Dashboard() {
     void loadLiveSales(controller.signal);
     return () => controller.abort();
   }, [loadLiveSales]);
+
+  useEffect(() => {
+    if (!refreshSeconds || isReloading) return;
+    const timer = window.setTimeout(() => void loadLiveSales(undefined, true), refreshSeconds * 1000);
+    return () => window.clearTimeout(timer);
+  }, [refreshSeconds, isReloading, loadLiveSales]);
 
   const handleReloadRecords = () => {
     if (!isReloading) void loadLiveSales();
@@ -326,6 +333,15 @@ function Dashboard() {
             <p>One Click. Every Sale. Complete Control.</p>
           </div>
           <div className="header-actions">
+            <label className="dashboard-auto-refresh">
+              Auto refresh
+              <select value={refreshSeconds} onChange={event => setRefreshSeconds(Number(event.target.value))}>
+                <option value={0}>Manual</option>
+                <option value={15}>15s</option>
+                <option value={30}>30s</option>
+                <option value={60}>60s</option>
+              </select>
+            </label>
             <button type="button" className="head-btn header-shortcut" disabled={!loadedAt}
               onClick={() => {
                 setActiveTab('overview');
