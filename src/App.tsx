@@ -318,6 +318,16 @@ function Dashboard() {
           </div>
           <div className="header-actions">
             <button
+              id="refreshData"
+              className="head-btn"
+              type="button"
+              title="Load the latest sales from Supabase"
+              disabled={isReloading}
+              onClick={handleReloadRecords}
+            >
+              {isReloading ? '⟳ Syncing…' : '↻ Refresh'}
+            </button>
+            <button
               id="geminiTrigger"
               className="head-btn"
               type="button"
@@ -332,16 +342,6 @@ function Dashboard() {
               onClick={() => window.print()}
             >
               ▤ Print report
-            </button>
-            <button
-              id="refreshData"
-              className="head-btn"
-              type="button"
-              title="Load the latest sales from Supabase"
-              disabled={isReloading}
-              onClick={handleReloadRecords}
-            >
-              {isReloading ? '⟳ Syncing…' : '↻ Reload records'}
             </button>
           </div>
         </div>
