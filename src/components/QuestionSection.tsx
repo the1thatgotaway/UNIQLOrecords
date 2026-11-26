@@ -873,7 +873,7 @@ export function QuestionSection({
         <div className="heading-eyebrow">Focused analysis</div>
         {qNum === 1 && (
           <>
-            <h2>Question 1: High-Price Sales</h2>
+            <h2>High-Price Sales</h2>
             <p className="description">
               Sales with gross unit price greater than ₱1,000 for product{' '}
               <strong>UQ-HT-02</strong>.
@@ -882,7 +882,7 @@ export function QuestionSection({
         )}
         {qNum === 2 && (
           <>
-            <h2>Question 2: Customer Product Sales</h2>
+            <h2>Customer Product Sales</h2>
             <p className="description">
               Customer <strong>Benjamin Aquino</strong> purchasing product{' '}
               <strong>UQ-AIR-01</strong>.
@@ -891,7 +891,7 @@ export function QuestionSection({
         )}
         {qNum === 3 && (
           <>
-            <h2>Question 3: Employee and Store Sales</h2>
+            <h2>Employee and Store Sales</h2>
             <p className="description">
               Employee <strong>EMP-003</strong> at store <strong>STORE-003</strong>.
             </p>
@@ -899,7 +899,7 @@ export function QuestionSection({
         )}
         {qNum === 4 && (
           <>
-            <h2>Question 4: March 2024 Promotional Sales</h2>
+            <h2>March 2024 Promotional Sales</h2>
             <p className="description">
               Sales in <strong>March 2024</strong> for product <strong>UQ-BAG-01</strong> with
               promotion <strong>PROMO-LIMITED</strong>.
@@ -1087,7 +1087,7 @@ export function QuestionSection({
         <div className="card interpretation-card" aria-live="polite">
           <div className="interpretation-head-row">
             <div>
-              <div className="explanation-kicker">{`GRAPH SUMMARY / QUESTION ${questionId}`}</div>
+              <div className="explanation-kicker">Graph summary</div>
               <h3>Quick takeaway</h3>
             </div>
             <button
