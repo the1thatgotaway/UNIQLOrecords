@@ -1086,3 +1086,6 @@ body.light .overview-hero .overview-eyebrow { color: #ffb2bb; }
 .warehouse-dialog-footer { bottom: 0; justify-content: flex-end; border-top: 1px solid var(--line); }
 .warehouse-dialog-body { padding: clamp(14px, 3vw, 28px); }
 .warehouse-diagram { display: block; margin: 0 auto 20px; width: min(100%, 840px); height: auto; border-radius: 10px; }
+
+.dashboard-header .header-shortcut { display: inline-flex; align-items: center; gap: 7px; }
+#complete-sales-records { scroll-margin-top: 20px; }

@@ -1,4 +1,4 @@
-import { Activity, Columns2, Database, ArrowUpRight, LayoutDashboard, Moon, Printer, Store, Sun, Tag, TrendingUp, Users } from 'lucide-react';
+import { Activity, Columns2, Database, ArrowUpRight, LayoutDashboard, Moon, Printer, Store, Sun, Table2, Tag, TrendingUp, Users } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import rawMidtermRows from './data/offlineSales.json';
 import type {
@@ -73,6 +73,7 @@ function Dashboard() {
   });
   const [miningQuestion, setMiningQuestion] = useState<FocusedQuestionId>('3');
   const [isLight, setIsLight] = useState<boolean>(true);
+  const [recordsRequested, setRecordsRequested] = useState(false);
   const [loadedAt, setLoadedAt] = useState('');
   const [salesTiming, setSalesTiming] = useState<{ requestMs: number; supabaseMs: number | null } | null>(null);
 
@@ -106,6 +107,14 @@ function Dashboard() {
   useEffect(() => {
     document.body.classList.toggle('light', isLight);
   }, [isLight]);
+
+  useEffect(() => {
+    if (!recordsRequested || activeTab !== 'overview' || !loadedAt) return;
+    const heading = document.getElementById('complete-sales-records');
+    heading?.focus({ preventScroll: true });
+    heading?.scrollIntoView({ block: 'start' });
+    setRecordsRequested(false);
+  }, [recordsRequested, activeTab, loadedAt]);
 
   const skuChoices = useMemo(
     () => [...new Set(snapshotRows.map(skuOf).filter(Boolean))].sort(),
@@ -317,6 +326,17 @@ function Dashboard() {
             <p>One Click. Every Sale. Complete Control.</p>
           </div>
           <div className="header-actions">
+            <button type="button" className="head-btn header-shortcut" disabled={!loadedAt}
+              onClick={() => {
+                setActiveTab('overview');
+                setRecordsRequested(true);
+              }}>
+              <Table2 size={16} aria-hidden="true" /> Complete Sales Records
+            </button>
+            <button type="button" className="head-btn header-shortcut"
+              aria-haspopup="dialog" onClick={() => setSchemaOpen(true)}>
+              <Database size={16} aria-hidden="true" /> Warehouse Schema
+            </button>
             <button
               id="refreshData"
               className="head-btn"
@@ -440,11 +460,6 @@ function Dashboard() {
               className={`tab${activeTab === 'comparison' ? ' active' : ''}`}
               aria-selected={activeTab === 'comparison'} onClick={() => setActiveTab('comparison')}>
               <Columns2 size={17} aria-hidden="true" /><span>Comparative Analysis</span>
-            </button>
-            <button type="button"
-              className="tab"
-              aria-haspopup="dialog" onClick={() => setSchemaOpen(true)}>
-              <Database size={17} aria-hidden="true" /><span>Warehouse Schema</span>
             </button>
           </nav>
 

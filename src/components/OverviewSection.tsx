@@ -777,7 +777,7 @@ export function OverviewSection({
         <div className="card full-records-card">
           <div className="overview-chart-head">
             <div>
-              <h3>Complete Sales Records</h3>
+              <h3 id="complete-sales-records" tabIndex={-1}>Complete Sales Records</h3>
               <p id="overviewRecordCount" className="description">
                 {`${formatNumber(filteredRows.length)} matching transactions out of ${formatNumber(
                   allRows.length
