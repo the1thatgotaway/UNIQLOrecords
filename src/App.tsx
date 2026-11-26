@@ -331,11 +331,11 @@ function Dashboard() {
                 setActiveTab('overview');
                 setRecordsRequested(true);
               }}>
-              <Table2 size={16} aria-hidden="true" /> Complete Sales Records
+              <Table2 size={16} aria-hidden="true" /> Records
             </button>
             <button type="button" className="head-btn header-shortcut"
               aria-haspopup="dialog" onClick={() => setSchemaOpen(true)}>
-              <Database size={16} aria-hidden="true" /> Warehouse Schema
+              <Database size={16} aria-hidden="true" /> Schema
             </button>
             <button
               id="refreshData"

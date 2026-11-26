@@ -74,12 +74,12 @@ function downloadBlob(content: string, filename: string) {
 }
 
 const systemOverview = [
-  ['Who uses it', 'Retail analysts and store managers can review sales activity by product, customer, employee, and store.'],
-  ['What it shows', 'Explore sales totals, units sold, transaction records, and four Midterm vs. Finals comparisons.'],
-  ['Where the data lives', 'The Supabase warehouse connects sales to date, customer, product, store, employee, and promotion dimensions.'],
-  ['When it updates', 'UniQlick loads sales when the dashboard opens. Use Refresh to fetch the latest available records.'],
-  ['Why it matters', 'Compare results across datasets and investigate unusual changes using the transactions behind them.'],
-  ['How it works', 'Dashboard filters narrow the sales records. Isolation Forest flags unusual patterns, and Scout helps answer sales questions.'],
+  ['Who uses UniQlick?', 'Store managers and sales analysts can use it to see what sold, where it sold, and which promotions were applied.'],
+  ['What can I see?', 'Start with net sales and units sold, then open the records behind those totals. The comparison page shows how the four Midterm scenarios look with the Finals data.'],
+  ['Where do the records come from?', 'Sales are stored in Supabase. Each transaction links to its date, product, customer, store, employee, and promotion.'],
+  ['When do the numbers update?', 'The dashboard loads the latest available records when you open it. Select Refresh to check for updates while you work.'],
+  ['Why use it?', 'If sales spike or drop, you can compare periods and inspect the transactions behind the change.'],
+  ['How do I get started?', 'Pick a view in the sidebar, filter the records, or ask Scout a sales question. In Data Mining, Isolation Forest flags unusual patterns for you to review.'],
 ] as const;
 
 export function OverviewSection({
