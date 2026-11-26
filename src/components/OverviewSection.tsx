@@ -77,7 +77,7 @@ const systemOverview = [
   ['Who uses UniQlick?', 'Store managers and sales analysts can use it to see what sold, where it sold, and which promotions were applied.'],
   ['What can I see?', 'Start with net sales and units sold, then open the records behind those totals. The comparison page shows how the four Midterm scenarios look with the Finals data.'],
   ['Where do the records come from?', 'Sales are stored in Supabase. Each transaction links to its date, product, customer, store, employee, and promotion.'],
-  ['When do the numbers update?', 'The dashboard loads the latest available records when you open it. Refresh whenever you need to, or choose an auto-refresh interval in the header.'],
+  ['When do the numbers update?', 'The dashboard loads the latest available records when you open it. Choose an auto-refresh interval in the header, or use Refresh on the cover page.'],
   ['Why use it?', 'If sales spike or drop, you can compare periods and inspect the transactions behind the change.'],
   ['How do I get started?', 'Pick a view in the sidebar, filter the records, or ask Scout a sales question. In Data Mining, Isolation Forest flags unusual patterns for you to review.'],
 ] as const;

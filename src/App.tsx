@@ -43,7 +43,27 @@ const midtermSnapshot: Pick<MidtermSnapshot, 'captured_at' | 'baseline' | 'scena
 
 export default function App() {
   const view = new URLSearchParams(window.location.search).get('view');
-  if (view) return <Dashboard />;
+  return view ? <Dashboard /> : <CoverPage />;
+}
+
+function CoverPage() {
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState('');
+
+  async function refreshSales() {
+    setRefreshing(true);
+    setRefreshMessage('Checking for the latest sales…');
+    try {
+      const response = await fetch('/api/sales');
+      if (!response.ok) throw new Error('Sales request failed');
+      const snapshot = parseImportedSnapshot(await response.text());
+      setRefreshMessage(formatNumber(snapshot.count) + ' sales records available from Supabase.');
+    } catch {
+      setRefreshMessage('Could not refresh sales. Try again in a moment.');
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   return (
     <main className="uniqlick-cover">
@@ -53,9 +73,15 @@ export default function App() {
         <p className="uniqlick-cover-intro">
           UniQlick helps you understand your retail sales. Track product and store performance, explore customer purchases, and investigate unusual activity.
         </p>
-        <a className="uniqlick-cover-link" href="?view=dashboard">
+        <div className="cover-actions">
+          <a className="uniqlick-cover-link" href="?view=dashboard">
           Open dashboard <ArrowUpRight size={19} aria-hidden="true" />
-        </a>
+          </a>
+          <button type="button" className="uniqlick-cover-link cover-refresh" disabled={refreshing} onClick={refreshSales}>
+            {refreshing ? 'Refreshing…' : '↻ Refresh'}
+          </button>
+        </div>
+        {refreshMessage && <p className="cover-refresh-status" role="status">{refreshMessage}</p>}
       </div>
       <div className="uniqlick-cover-art" aria-hidden="true">
         <span>U</span>
@@ -334,8 +360,8 @@ function Dashboard() {
           </div>
           <div className="header-actions">
             <label className="dashboard-auto-refresh">
-              Auto refresh
-              <select value={refreshSeconds} onChange={event => setRefreshSeconds(Number(event.target.value))}>
+              Auto:
+              <select aria-label="Auto refresh interval" value={refreshSeconds} onChange={event => setRefreshSeconds(Number(event.target.value))}>
                 <option value={0}>Manual</option>
                 <option value={15}>15s</option>
                 <option value={30}>30s</option>
@@ -352,16 +378,6 @@ function Dashboard() {
             <button type="button" className="head-btn header-shortcut"
               aria-haspopup="dialog" onClick={() => setSchemaOpen(true)}>
               <Database size={16} aria-hidden="true" /> Schema
-            </button>
-            <button
-              id="refreshData"
-              className="head-btn"
-              type="button"
-              title="Load the latest sales from Supabase"
-              disabled={isReloading}
-              onClick={handleReloadRecords}
-            >
-              {isReloading ? '⟳ Syncing…' : '↻ Refresh'}
             </button>
             <button
               id="geminiTrigger"

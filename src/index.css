@@ -1138,3 +1138,8 @@ body.light .overview-hero .overview-eyebrow { color: #ffb2bb; }
   content: ''; display: inline-block; width: 7px; height: 7px;
   margin-inline-end: 8px; border-radius: 50%; background: currentColor;
 }
+
+.cover-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.cover-refresh { cursor: pointer; }
+.cover-refresh:disabled { cursor: wait; opacity: .7; }
+.uniqlick-cover .cover-refresh-status { font-size: 14px; margin-top: 12px; }
