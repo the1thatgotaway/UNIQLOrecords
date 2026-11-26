@@ -1143,3 +1143,4 @@ body.light .overview-hero .overview-eyebrow { color: #ffb2bb; }
 .cover-refresh { cursor: pointer; }
 .cover-refresh:disabled { cursor: wait; opacity: .7; }
 .uniqlick-cover .cover-refresh-status { font-size: 14px; margin-top: 12px; }
+.overview-intro p + p { margin-top: 10px; }

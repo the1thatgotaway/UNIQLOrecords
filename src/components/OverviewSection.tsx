@@ -359,9 +359,12 @@ export function OverviewSection({
       <div className="card full-dash-title overview-intro">
         <div>
           <span className="overview-eyebrow">Executive Dashboard</span>
-          <h2 id="overviewHeading">UniQlick Retail Sales Analytics</h2>
+          <h2 id="overviewHeading">UNIQLO Retail Sales Overview</h2>
           <p>
-            Use <strong>UniQlick</strong> to see what sold, where it sold, and which promotions were applied. The dashboard links Supabase transactions to products, customers, stores, and employees, so you can trace changes in sales back to the records behind them.
+            <strong>UNIQLO</strong> is a Japanese apparel retailer built around LifeWear, its approach to practical clothing for everyday life. Its product lines include HEATTECH and AIRism.
+          </p>
+          <p>
+            <strong>UniQlick</strong> is a sales analytics project that uses a simulated UNIQLO retail dataset. Review net sales and units sold by product and store, see which purchases were made under promotions, and open the transactions behind a change in sales.
           </p>
         </div>
         <div className="full-dash-actions">
