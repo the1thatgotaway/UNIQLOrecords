@@ -19,6 +19,7 @@ export const MidtermComparison = memo(function MidtermComparison({ midterm, fina
           const after = matches(finals);
           const periods = [before, after].map(rows => groupSales(rows, id === '4' ? 'day' : 'month'));
           const labels = [...new Set(periods.flatMap(series => [...series.keys()]))].sort();
+          const peakSales = Math.max(0, ...periods.flatMap(series => Array.from(series.values(), bucket => bucket.sales)));
           const metrics = [
             { label: 'Matching records', a: before.length, b: after.length, format: formatNumber },
             { label: 'Units sold', a: metricSum(before, 'quantity_sold'), b: metricSum(after, 'quantity_sold'), format: formatNumber },
@@ -27,14 +28,27 @@ export const MidtermComparison = memo(function MidtermComparison({ midterm, fina
           return <article key={id}>
             <h3>{SCENARIO_META[id].title}</h3>
             <p>{id === '3' ? 'Employee EMP-033 at STORE-033' : SCENARIO_META[id].subtitle}</p>
-            {labels.length ? <ChartCanvas isLight={isLight} containerClassName="exam-trend"
-              ariaLabel={`Midterm and Finals net sales for ${SCENARIO_META[id].shortTitle}`}
-              config={{ type: 'line', data: { labels, datasets: periods.map((series, i) => ({
-                label: i ? 'Finals' : 'Midterm', data: labels.map(key => series.get(key)?.sales ?? 0),
-                borderColor: i ? (isLight ? '#a92729' : '#ff8079') : (isLight ? '#506276' : '#9eb9d2'),
-                borderDash: i ? [] : [4, 3], pointRadius: 2,
-              })) }, options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true, title: { display: true, text: 'Net sales (PHP)' } } } } }}
-            /> : <p>No matching sales in either dataset.</p>}
+            <div className="exam-chart-pair">
+              {periods.map((series, index) => {
+                const title = index === 0 ? 'Saved Midterm' : 'Live Finals';
+                const color = index === 0 ? (isLight ? '#506276' : '#9eb9d2') : (isLight ? '#a92729' : '#ff8079');
+                return <figure key={title}>
+                  <figcaption>{title}</figcaption>
+                  {series.size ? <ChartCanvas isLight={isLight} containerClassName="exam-trend"
+                    ariaLabel={`${title} net sales for ${SCENARIO_META[id].shortTitle}`}
+                    config={{
+                      type: 'line',
+                      data: { labels, datasets: [{ label: 'Net sales (PHP)', data: labels.map(key => series.get(key)?.sales ?? 0), borderColor: color, pointRadius: 2 }] },
+                      options: {
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true, suggestedMax: peakSales, title: { display: true, text: 'Net sales (PHP)' } } },
+                      },
+                    }}
+                  /> : <p className="exam-empty">No matching sales records.</p>}
+                </figure>;
+              })}
+            </div>
             <div className="exam-metrics"><table aria-label={SCENARIO_META[id].title}>
               <thead><tr>{['Metric', 'Midterm', 'Finals', 'Change'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
               <tbody>{metrics.map(({ label, a, b, format }) => <tr key={label}>
