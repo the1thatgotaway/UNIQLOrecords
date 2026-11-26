@@ -33,8 +33,8 @@ export function WarehouseSchema({ onClose }: { onClose: () => void }) {
       <div className="warehouse-dialog-body" id="warehouse-diagram-panel" hidden={section !== 'diagram'}>
         <img className="warehouse-diagram" src="/assets/warehouse-schema.png?v=2" width={1160} height={811} alt="Star schema showing fact_sales linked to the date, product, store, employee, customer, and promotion dimensions" />
       </div>
-      <div className="warehouse-dialog-body" hidden={section !== 'tables'}>
-        <h3 className="warehouse-tables-title">Warehouse Tables</h3>
+      <div className="warehouse-dialog-body warehouse-table-panel" hidden={section !== 'tables'}>
+
         <p>Six dimension tables describe each sale in <code>public.fact_sales</code>. Each foreign key links to the matching dimension’s primary key.</p>
         <article className="card warehouse-fact">
           <h3><Database size={19} aria-hidden="true" /> <code>fact_sales</code><span className="warehouse-table-type">Fact table</span></h3>
