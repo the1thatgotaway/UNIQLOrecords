@@ -1144,3 +1144,19 @@ body.light .overview-hero .overview-eyebrow { color: #ffb2bb; }
 .cover-refresh:disabled { cursor: wait; opacity: .7; }
 .uniqlick-cover .cover-refresh-status { font-size: 14px; margin-top: 12px; }
 .overview-intro p + p { margin-top: 10px; }
+
+.dashboard-header .head-btn,
+.dashboard-header .dashboard-auto-refresh select {
+  background: var(--panel);
+  color: var(--text);
+  border-color: var(--line);
+}
+.dashboard-header .head-btn:hover:not(:disabled) {
+  background: var(--panel2);
+  color: var(--text);
+  border-color: var(--accent);
+}
+.dashboard-header :is(.head-btn, .dashboard-auto-refresh select):focus-visible {
+  outline: 2px solid white;
+  outline-offset: 3px;
+}
