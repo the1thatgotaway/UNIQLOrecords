@@ -1089,3 +1089,18 @@ body.light .overview-hero .overview-eyebrow { color: #ffb2bb; }
 
 .dashboard-header .header-shortcut { display: inline-flex; align-items: center; gap: 7px; }
 #complete-sales-records { scroll-margin-top: 20px; }
+
+.system-overview dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 12px;
+  margin: 14px 0 0;
+}
+.system-overview dl > div {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel2);
+}
+.system-overview dt { color: var(--accent); font-weight: 700; }
+.system-overview dd { margin: 6px 0 0; color: var(--muted); line-height: 1.55; }

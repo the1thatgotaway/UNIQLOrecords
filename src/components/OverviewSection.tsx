@@ -73,6 +73,15 @@ function downloadBlob(content: string, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
+const systemOverview = [
+  ['Who uses it', 'Retail analysts and store managers can review sales activity by product, customer, employee, and store.'],
+  ['What it shows', 'Explore sales totals, units sold, transaction records, and four Midterm vs. Finals comparisons.'],
+  ['Where the data lives', 'The Supabase warehouse connects sales to date, customer, product, store, employee, and promotion dimensions.'],
+  ['When it updates', 'UniQlick loads sales when the dashboard opens. Use Refresh to fetch the latest available records.'],
+  ['Why it matters', 'Compare results across datasets and investigate unusual changes using the transactions behind them.'],
+  ['How it works', 'Dashboard filters narrow the sales records. Isolation Forest flags unusual patterns, and Scout helps answer sales questions.'],
+] as const;
+
 export function OverviewSection({
   allRows,
   filteredRows,
@@ -352,8 +361,7 @@ export function OverviewSection({
           <span className="overview-eyebrow">UniQlick / SALES DATABASE</span>
           <h2 id="overviewHeading">Executive Dashboard</h2>
           <p>
-            Complete transaction overview from Supabase — every accessible record, not only the four
-            analysis filters.
+            UniQlick brings retail sales records and analysis together. Track performance across products, stores, and promotions, then use the underlying transactions to investigate what changed.
           </p>
         </div>
         <div className="full-dash-actions">
@@ -368,6 +376,18 @@ export function OverviewSection({
           </button>
         </div>
       </div>
+
+      <section className="card system-overview" aria-labelledby="system-overview-heading">
+        <h3 id="system-overview-heading">UniQlick at a glance</h3>
+        <dl>
+          {systemOverview.map(([label, description]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{description}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
 
       <div id="overviewStatus" className={`status ${statusType}`} role="status" aria-live="polite">
         {statusMessage}
