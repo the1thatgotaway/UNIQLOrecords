@@ -19,7 +19,7 @@ export function WarehouseSchema({ onClose }: { onClose: () => void }) {
     <dialog ref={dialog} onClose={onClose} className="warehouse-dialog warehouse-schema" aria-labelledby="warehouse-title">
       <div className="warehouse-dialog-heading">
         <Database size={24} aria-hidden="true" />
-        <h2 id="warehouse-title">UniQlick Data Warehouse Schema</h2>
+        <h2 id="warehouse-title">UniQlick Star Schema Architecture</h2>
         <button type="button" className="action-btn" aria-label="Close schema" onClick={() => dialog.current?.close()}><X size={18} /></button>
       </div>
       <div className="warehouse-view-switch" role="group" aria-label="Warehouse view">

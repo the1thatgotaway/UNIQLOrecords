@@ -1179,3 +1179,7 @@ body.light .dashboard-header {
 .warehouse-dialog-body { min-height: 0; overflow: auto; }
 .warehouse-dialog-body[hidden] { display: none; }
 .warehouse-dialog-heading, .warehouse-view-switch, .warehouse-dialog-footer { flex-shrink: 0; }
+
+.warehouse-dialog-heading { display: grid; grid-template-columns: minmax(44px, 1fr) minmax(0, auto) minmax(44px, 1fr); }
+.warehouse-dialog-heading h2 { text-align: center; text-wrap: balance; }
+.warehouse-dialog-heading button { justify-self: end; }
