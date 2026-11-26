@@ -19,6 +19,7 @@ import {
   metricSum,
   pointKey,
   PRICE_THRESHOLD,
+  SCENARIO_META,
   promoOf,
   skuOf,
   storeOf,
@@ -34,6 +35,7 @@ import { ChartCanvas } from './ChartCanvas.tsx';
 
 interface QuestionSectionProps {
   comparisonOnly?: boolean;
+  miningOnly?: boolean;
   questionId: FocusedQuestionId;
   rows: SalesRecord[];
   midtermSnapshot: Pick<MidtermSnapshot, 'captured_at' | 'baseline' | 'scenarios'>;
@@ -94,6 +96,7 @@ function downloadFile(content: string, filename: string) {
 
 export function QuestionSection({
   comparisonOnly = false,
+  miningOnly = false,
   questionId,
   rows,
   midtermSnapshot,
@@ -679,6 +682,191 @@ export function QuestionSection({
 
   if (comparisonOnly) return comparisonPanel;
 
+  const miningPanel = (
+    <div className="card ai-question-card" id={`aiPanel${questionId}`} tabIndex={-1} aria-live="polite">
+      <div className="ai-question-head">
+        <div className="ai-head-copy">
+          <span className="ai-eyebrow">{`UniQlick / MACHINE LEARNING / QUESTION ${questionId}`}</span>
+          <h2>{miningOnly ? 'Isolation Forest Anomaly Detection' : 'AI Graph Analysis'}</h2>
+          <p>{miningOnly ? SCENARIO_META[questionId].subtitle : 'Finds unusual patterns in this question’s graph.'}</p>
+        </div>
+        <span
+          className={`ai-status ${
+            mlResult.reason ? 'neutral' : mlResult.flags.length ? 'warning' : ''
+          }`}
+          id={`aiStatus${questionId}`}
+        >
+          {mlResult.reason
+            ? 'Insufficient data'
+            : mlResult.flags.length
+              ? `Review ${mlResult.flags.length} flagged`
+              : 'No strong anomalies'}
+        </span>
+        <div className="ai-question-actions">
+          <button
+            type="button"
+            id={`aiRun${questionId}`}
+            className="action-btn"
+            title="Recalculate ML findings"
+            onClick={() => setMlRunTick((n) => n + 1)}
+          >
+            ↻ Analyze
+          </button>
+          <button
+            type="button"
+            id={`aiExport${questionId}`}
+            className="action-btn primary"
+            disabled={Boolean(mlResult.reason)}
+            onClick={handleExportAiReport}
+          >
+            ↓ Export
+          </button>
+          <button
+            type="button"
+            className="action-btn"
+            onClick={() => onOpenGemini('anomaly-explanation')}
+          >
+            ✦ Explain with Groq
+          </button>
+        </div>
+      </div>
+
+      <div className="ai-metrics">
+        <div className="ai-metric">
+          <span>Chart points</span>
+          <strong id={`aiPoints${questionId}`}>{formatNumber(groups.length)}</strong>
+        </div>
+        <div className="ai-metric">
+          <span>Anomalies</span>
+          <strong id={`aiFlags${questionId}`}>{formatNumber(mlResult.flags.length)}</strong>
+        </div>
+        <div className="ai-metric">
+          <span>Model</span>
+          <strong className="text-[17px]!" id={`aiModel${questionId}`}>
+            {mlResult.reason ? 'Needs data' : 'Trained locally'}
+          </strong>
+        </div>
+      </div>
+
+      <div className="ai-narrative" id={`aiNarrative${questionId}`}>
+        {aiNarrative}
+      </div>
+
+      <div className="ai-findings" id={`aiFindings${questionId}`}>
+        {mlResult.reason ? (
+          <div className="ai-finding">
+            <b>Model status</b>
+            {mlResult.reason}
+          </div>
+        ) : topFlag ? (
+          <div className="ai-finding">
+            <b>Top flag</b>
+            {`${topFlag.period}: ${topFlag.reason}`}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="ai-anomaly-label">Flagged graph points</div>
+      <div className="ai-table-wrap">
+        <table aria-label={`Question ${questionId} AI anomaly results`}>
+          <thead>
+            <tr>
+              <th>Period / sale</th>
+              <th>Net sales</th>
+              <th>Units</th>
+              <th>ML score</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody id={`aiRows${questionId}`}>
+            {mlResult.flags.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="empty">
+                  {mlResult.reason
+                    ? `Analysis unavailable: ${mlResult.reason}`
+                    : 'No anomalies detected.'}
+                </td>
+              </tr>
+            ) : (
+              mlResult.flags.map((f) => (
+                <tr key={f.period}>
+                  <td>{f.period}</td>
+                  <td>{formatMoney(f.sales)}</td>
+                  <td>{formatNumber(f.qty)}</td>
+                  <td>
+                    <span className="ai-score">{f.score.toFixed(3)}</span>
+                  </td>
+                  <td>{f.reason}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+        <div id={`flagDetail${questionId}`}>
+          {topFlag && mlResult.threshold !== undefined && (
+            <details>
+              <summary>
+                {`Inspect ${topFlag.period} · ${topFlagMembers.length} underlying sales · score ${topFlag.score.toFixed(
+                  3
+                )} / cutoff ${mlResult.threshold.toFixed(3)}`}
+              </summary>
+              <p>
+                {`Check these receipts against the source or generated-ID ledger before acting on this flag. Net sales ${formatMoney(
+                  topFlag.sales
+                )} across ${topFlag.qty} units.`}
+              </p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Sale ID</th>
+                    <th>Date</th>
+                    <th>Quantity</th>
+                    <th>Gross unit price</th>
+                    <th>Net sales</th>
+                    <th>Scenario fields</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topFlagMembers.map((row) => (
+                    <tr key={row.sales_fact_id}>
+                      <td>{row.sales_fact_id}</td>
+                      <td>{dateOf(row)}</td>
+                      <td>{row.quantity_sold}</td>
+                      <td>{formatMoney(row.gross_unit_price)}</td>
+                      <td>{formatMoney(row.net_sales_collected)}</td>
+                      <td>
+                        {[
+                          skuOf(row),
+                          customerOf(row),
+                          employeeOf(row),
+                          storeOf(row),
+                          promoOf(row),
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          )}
+        </div>
+      </div>
+
+      <details className="ai-extra">
+        <summary>How detection works</summary>
+        <p>
+          Isolation Forest compares the current graph’s sales, units, and prices. Flags are
+          statistical signals, not confirmed errors. Dates are simulated, so time-based spikes
+          are not verified real events.
+        </p>
+      </details>
+    </div>
+  );
+
+  if (miningOnly) return miningPanel;
+
   return (
     <section id={`question${questionId}`}>
       <div className="card question-heading">
@@ -915,186 +1103,6 @@ export function QuestionSection({
           </p>
         </div>
 
-        <div className="card ai-question-card" id={`aiPanel${questionId}`} tabIndex={-1} aria-live="polite">
-          <div className="ai-question-head">
-            <div className="ai-head-copy">
-              <span className="ai-eyebrow">{`UniQlick / MACHINE LEARNING / QUESTION ${questionId}`}</span>
-              <h2>AI Graph Analysis</h2>
-              <p>Finds unusual patterns in this question’s graph.</p>
-            </div>
-            <span
-              className={`ai-status ${
-                mlResult.reason ? 'neutral' : mlResult.flags.length ? 'warning' : ''
-              }`}
-              id={`aiStatus${questionId}`}
-            >
-              {mlResult.reason
-                ? 'Insufficient data'
-                : mlResult.flags.length
-                  ? `Review ${mlResult.flags.length} flagged`
-                  : 'No strong anomalies'}
-            </span>
-            <div className="ai-question-actions">
-              <button
-                type="button"
-                id={`aiRun${questionId}`}
-                className="action-btn"
-                title="Recalculate ML findings"
-                onClick={() => setMlRunTick((n) => n + 1)}
-              >
-                ↻ Analyze
-              </button>
-              <button
-                type="button"
-                id={`aiExport${questionId}`}
-                className="action-btn primary"
-                disabled={Boolean(mlResult.reason)}
-                onClick={handleExportAiReport}
-              >
-                ↓ Export
-              </button>
-              <button
-                type="button"
-                className="action-btn"
-                onClick={() => onOpenGemini('anomaly-explanation')}
-              >
-                ✦ Explain with Groq
-              </button>
-            </div>
-          </div>
-
-          <div className="ai-metrics">
-            <div className="ai-metric">
-              <span>Chart points</span>
-              <strong id={`aiPoints${questionId}`}>{formatNumber(groups.length)}</strong>
-            </div>
-            <div className="ai-metric">
-              <span>Anomalies</span>
-              <strong id={`aiFlags${questionId}`}>{formatNumber(mlResult.flags.length)}</strong>
-            </div>
-            <div className="ai-metric">
-              <span>Model</span>
-              <strong className="text-[17px]!" id={`aiModel${questionId}`}>
-                {mlResult.reason ? 'Needs data' : 'Trained locally'}
-              </strong>
-            </div>
-          </div>
-
-          <div className="ai-narrative" id={`aiNarrative${questionId}`}>
-            {aiNarrative}
-          </div>
-
-          <div className="ai-findings" id={`aiFindings${questionId}`}>
-            {mlResult.reason ? (
-              <div className="ai-finding">
-                <b>Model status</b>
-                {mlResult.reason}
-              </div>
-            ) : topFlag ? (
-              <div className="ai-finding">
-                <b>Top flag</b>
-                {`${topFlag.period}: ${topFlag.reason}`}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="ai-anomaly-label">Flagged graph points</div>
-          <div className="ai-table-wrap">
-            <table aria-label={`Question ${questionId} AI anomaly results`}>
-              <thead>
-                <tr>
-                  <th>Period / sale</th>
-                  <th>Net sales</th>
-                  <th>Units</th>
-                  <th>ML score</th>
-                  <th>Reason</th>
-                </tr>
-              </thead>
-              <tbody id={`aiRows${questionId}`}>
-                {mlResult.flags.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="empty">
-                      {mlResult.reason
-                        ? `Analysis unavailable: ${mlResult.reason}`
-                        : 'No anomalies detected.'}
-                    </td>
-                  </tr>
-                ) : (
-                  mlResult.flags.map((f) => (
-                    <tr key={f.period}>
-                      <td>{f.period}</td>
-                      <td>{formatMoney(f.sales)}</td>
-                      <td>{formatNumber(f.qty)}</td>
-                      <td>
-                        <span className="ai-score">{f.score.toFixed(3)}</span>
-                      </td>
-                      <td>{f.reason}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-            <div id={`flagDetail${questionId}`}>
-              {topFlag && mlResult.threshold !== undefined && (
-                <details>
-                  <summary>
-                    {`Inspect ${topFlag.period} · ${topFlagMembers.length} underlying sales · score ${topFlag.score.toFixed(
-                      3
-                    )} / cutoff ${mlResult.threshold.toFixed(3)}`}
-                  </summary>
-                  <p>
-                    {`Check these receipts against the source or generated-ID ledger before acting on this flag. Net sales ${formatMoney(
-                      topFlag.sales
-                    )} across ${topFlag.qty} units.`}
-                  </p>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Sale ID</th>
-                        <th>Date</th>
-                        <th>Quantity</th>
-                        <th>Gross unit price</th>
-                        <th>Net sales</th>
-                        <th>Scenario fields</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {topFlagMembers.map((row) => (
-                        <tr key={row.sales_fact_id}>
-                          <td>{row.sales_fact_id}</td>
-                          <td>{dateOf(row)}</td>
-                          <td>{row.quantity_sold}</td>
-                          <td>{formatMoney(row.gross_unit_price)}</td>
-                          <td>{formatMoney(row.net_sales_collected)}</td>
-                          <td>
-                            {[
-                              skuOf(row),
-                              customerOf(row),
-                              employeeOf(row),
-                              storeOf(row),
-                              promoOf(row),
-                            ]
-                              .filter(Boolean)
-                              .join(' · ')}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </details>
-              )}
-            </div>
-          </div>
-
-          <details className="ai-extra">
-            <summary>How detection works</summary>
-            <p>
-              Isolation Forest compares the current graph’s sales, units, and prices. Flags are
-              statistical signals, not confirmed errors. Dates are simulated, so time-based spikes
-              are not verified real events.
-            </p>
-          </details>
-        </div>
       </div>
 
       {rows.length > 0 ? (

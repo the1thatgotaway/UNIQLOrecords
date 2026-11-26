@@ -1,4 +1,4 @@
-import { Activity, Columns2, ArrowDown, ArrowUpRight, LayoutDashboard, Moon, Store, Sun, Tag, TrendingUp, Users } from 'lucide-react';
+import { Activity, Columns2, ArrowUpRight, LayoutDashboard, Moon, Store, Sun, Tag, TrendingUp, Users } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import rawMidtermRows from './data/offlineSales.json';
 import type {
@@ -65,8 +65,8 @@ export default function App() {
 
 function Dashboard() {
   const [snapshotRows, setSnapshotRows] = useState<SalesRecord[]>([]);
-  const [activeTab, setActiveTab] = useState<ScenarioId | 'comparison'>(new URLSearchParams(window.location.search).get('view') === 'comparison' ? 'comparison' : 'overview');
-  const [jumpToMining, setJumpToMining] = useState(false);
+  const [activeTab, setActiveTab] = useState<ScenarioId | 'comparison' | 'mining'>(new URLSearchParams(window.location.search).get('view') === 'comparison' ? 'comparison' : 'overview');
+  const [miningQuestion, setMiningQuestion] = useState<FocusedQuestionId>('3');
   const [isLight, setIsLight] = useState<boolean>(true);
   const [loadedAt, setLoadedAt] = useState('');
   const [salesTiming, setSalesTiming] = useState<{ requestMs: number; supabaseMs: number | null } | null>(null);
@@ -101,16 +101,6 @@ function Dashboard() {
   useEffect(() => {
     document.body.classList.toggle('light', isLight);
   }, [isLight]);
-
-  useEffect(() => {
-    if (!jumpToMining || !loadedAt || activeTab === 'overview') return;
-    const panel = document.getElementById(`aiPanel${activeTab}`);
-    if (panel) {
-      panel.focus({ preventScroll: true });
-      panel.scrollIntoView({ block: 'start' });
-    }
-    setJumpToMining(false);
-  }, [jumpToMining, loadedAt, activeTab]);
 
   const skuChoices = useMemo(
     () => [...new Set(snapshotRows.map(skuOf).filter(Boolean))].sort(),
@@ -200,22 +190,23 @@ function Dashboard() {
       });
     }
 
-    const qRows = scenarioRowsMap[activeTab];
+    const questionId = activeTab === 'mining' ? miningQuestion : activeTab;
+    const qRows = scenarioRowsMap[questionId];
     const grouping = activeTab === '4' ? 'day' : 'month';
     const bucketsMap = groupSales(qRows, grouping);
     const sortedBuckets = [...bucketsMap.keys()]
       .sort()
       .map((k) => bucketsMap.get(k)!);
-    const mlModel = computeIsolationForest(sortedBuckets, activeTab, 'trend', grouping);
+    const mlModel = computeIsolationForest(sortedBuckets, questionId, 'trend', grouping);
     const qAnomalies = detectSalesAnomalies(qRows);
 
     return buildLlmContextPayload({
-      viewId: activeTab,
+      viewId: questionId,
       filteredRows: qRows,
       allRows: snapshotRows,
       totalLoadedCount: snapshotRows.length,
       snapshotSource: sourceName,
-      filterDescription: SCENARIO_META[activeTab].subtitle,
+      filterDescription: SCENARIO_META[questionId].subtitle,
       activeGrouping: grouping,
       midtermLoaded: true,
       midtermLabel,
@@ -225,6 +216,7 @@ function Dashboard() {
     });
   }, [
     activeTab,
+    miningQuestion,
     selectedSku,
     fromDate,
     toDate,
@@ -290,13 +282,14 @@ function Dashboard() {
     setGeminiOpen(true);
   };
 
-  const tabOrder: (ScenarioId | 'comparison')[] = ['overview', '1', '2', '3', '4', 'comparison'];
+  const focusedQuestion = activeTab === 'mining' ? miningQuestion : activeTab as FocusedQuestionId;
+  const tabOrder: (ScenarioId | 'comparison' | 'mining')[] = ['overview', '1', '2', '3', '4', 'comparison'];
 
   const handleTabsKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     const next = e.key === 'ArrowRight' || e.key === 'ArrowDown';
     const previous = e.key === 'ArrowLeft' || e.key === 'ArrowUp';
     if (!next && !previous) return;
-    const currentIdx = tabOrder.indexOf(activeTab);
+    const currentIdx = activeTab === 'mining' ? 0 : tabOrder.indexOf(activeTab);
     const nextIdx =
       (currentIdx + (next ? 1 : -1) + tabOrder.length) % tabOrder.length;
     setActiveTab(tabOrder[nextIdx]);
@@ -450,14 +443,11 @@ function Dashboard() {
               type="button"
               className="dashboard-mining-link"
               disabled={!loadedAt}
-              onClick={() => {
-                if (activeTab === 'overview' || activeTab === 'comparison') setActiveTab('3');
-                setJumpToMining(true);
-              }}
+              aria-current={activeTab === 'mining' ? 'page' : undefined}
+              onClick={() => setActiveTab('mining')}
             >
               <Activity size={17} aria-hidden="true" />
               <span>Isolation Forest <small>Anomaly Detection</small></span>
-              <ArrowDown size={14} aria-hidden="true" />
             </button>
           </div>
           <div className="dashboard-sidebar-footer">
@@ -522,10 +512,23 @@ function Dashboard() {
               onOpenGemini={(task) => openGemini(task)}
             />
           ) : (
+            <>
+              {activeTab === 'mining' && (
+                <div className="card">
+                  <label htmlFor="miningQuestion">Scenario</label>{' '}
+                  <select id="miningQuestion" value={miningQuestion}
+                    onChange={event => setMiningQuestion(event.target.value as FocusedQuestionId)}>
+                    {(['1', '2', '3', '4'] as const).map(id => (
+                      <option key={id} value={id}>{SCENARIO_META[id].title}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             <QuestionSection
-              key={activeTab}
-              questionId={activeTab as FocusedQuestionId}
-              rows={scenarioRowsMap[activeTab as FocusedQuestionId]}
+              key={activeTab === 'mining' ? `mining-${miningQuestion}` : activeTab}
+              miningOnly={activeTab === 'mining'}
+              questionId={focusedQuestion}
+              rows={scenarioRowsMap[focusedQuestion]}
               midtermSnapshot={midtermSnapshot}
               salesTiming={salesTiming}
               isReloading={isReloading}
@@ -535,6 +538,7 @@ function Dashboard() {
               statusTime={loadedAt}
               onOpenGemini={(task) => openGemini(task)}
             />
+            </>
           ))}
 
           <div className="footer">
