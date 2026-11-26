@@ -335,7 +335,7 @@ function Dashboard() {
               type="button"
               onClick={() => window.print()}
             >
-              <Printer size={16} aria-hidden="true" /> Save as PDF
+              <Printer size={16} aria-hidden="true" /> PDF
             </button>
           </div>
         </div>
