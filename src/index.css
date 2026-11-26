@@ -964,7 +964,7 @@ header:after {
 .dashboard-header {
   background: radial-gradient(ellipse at 78% 100%, #c7493c80, transparent 61%),
     linear-gradient(125deg, #771919, #982020 55%, #b32020);
-  padding-block: clamp(22px, 3vw, 38px);
+  padding-block: clamp(16px, 2vw, 26px);
 }
 .dashboard-header::after {
   inset: 0 0 0 32%;
@@ -977,17 +977,20 @@ header:after {
   mask-image: linear-gradient(90deg, transparent, #000 62%);
 }
 .dashboard-header .header-inner { position: relative; z-index: 1; }
-.dashboard-header-brand { flex: 1; min-width: 0; container-type: inline-size; }
+.dashboard-header-brand { flex: 1; min-width: 0; }
 .dashboard-header h1 {
-  font-size: clamp(46px, 23cqi, 230px);
-  line-height: .93;
+  font-size: clamp(36px, 4.5vw, 70px);
+  line-height: 1.08;
   white-space: nowrap;
 }
 @media (max-width: 850px) {
   .dashboard-header-brand { flex: none; width: 100%; }
-  .dashboard-header h1 { font-size: clamp(46px, 23cqi, 135px); }
+
 }
 .dashboard-header .header-actions { gap: 10px; }
+.dashboard-header .brand { margin-bottom: 8px; }
+.dashboard-header .brand-mark { width: 34px; height: 34px; font-size: 18px; }
+.dashboard-header #printReport { display: inline-flex; align-items: center; gap: 7px; }
 
 body::before { background: radial-gradient(ellipse at 100% 0%, #e2324b12, transparent 45%); }
 .dashboard-header { border-bottom-color: #8f2020; }

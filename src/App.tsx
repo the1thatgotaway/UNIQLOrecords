@@ -1,4 +1,4 @@
-import { Activity, Columns2, ArrowUpRight, LayoutDashboard, Moon, Store, Sun, Tag, TrendingUp, Users } from 'lucide-react';
+import { Activity, Columns2, ArrowUpRight, LayoutDashboard, Moon, Printer, Store, Sun, Tag, TrendingUp, Users } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import rawMidtermRows from './data/offlineSales.json';
 import type {
@@ -335,7 +335,7 @@ function Dashboard() {
               type="button"
               onClick={() => window.print()}
             >
-              ▤ Print report
+              <Printer size={16} aria-hidden="true" /> Save as PDF
             </button>
           </div>
         </div>
