@@ -1145,15 +1145,27 @@ body.light .overview-hero .overview-eyebrow { color: #ffb2bb; }
 .uniqlick-cover .cover-refresh-status { font-size: 14px; margin-top: 12px; }
 .overview-intro p + p { margin-top: 10px; }
 
+.dashboard-header {
+  --header-control-fill: #322a2d;
+  --header-control-hover: #413538;
+  --header-control-text: #f5edeb;
+  --header-control-border: #776267;
+}
+body.light .dashboard-header {
+  --header-control-fill: #f4ece8;
+  --header-control-hover: #eadbd6;
+  --header-control-text: #41262a;
+  --header-control-border: #d8bdb7;
+}
 .dashboard-header .head-btn,
 .dashboard-header .dashboard-auto-refresh select {
-  background: var(--panel);
-  color: var(--text);
-  border-color: var(--line);
+  background: var(--header-control-fill);
+  color: var(--header-control-text);
+  border-color: var(--header-control-border);
 }
 .dashboard-header .head-btn:hover:not(:disabled) {
-  background: var(--panel2);
-  color: var(--text);
+  background: var(--header-control-hover);
+  color: var(--header-control-text);
   border-color: var(--accent);
 }
 .dashboard-header :is(.head-btn, .dashboard-auto-refresh select):focus-visible {
