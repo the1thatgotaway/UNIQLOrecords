@@ -14,10 +14,15 @@ export function MidtermComparison({ midterm, finals, midtermSnapshot, ...control
     rows: filterScenarioRows(finals, id),
   })), [finals]);
 
+  const recordChange = finals.length - midterm.length;
+  const scale = midterm.length ? (finals.length / midterm.length).toFixed(2) : null;
+
   return (
     <section aria-labelledby="comparison-heading" className="exam-comparison">
       <h2 id="comparison-heading">Comparative Analysis</h2>
-      <p>Compare {formatNumber(midterm.length)} saved Midterm records with {formatNumber(finals.length)} records in the Finals warehouse.</p>
+      <p>Warehouse records <strong>{formatNumber(midterm.length)} → {formatNumber(finals.length)}</strong>{' '}
+        ({recordChange > 0 ? '+' : ''}{formatNumber(recordChange)} records{scale && `, ${scale}× the Midterm size`}).
+      </p>
       <div className="exam-grid">
         {scenarios.map(({ id, rows }) => (
           <article key={id}>
