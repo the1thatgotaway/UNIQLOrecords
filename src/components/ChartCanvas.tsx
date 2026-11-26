@@ -8,6 +8,7 @@ interface ChartCanvasProps {
   containerClassName?: string;
   ariaLabel: string;
   isLight?: boolean;
+  onFirstRender?: (milliseconds: number) => void;
   onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
 }
 
@@ -18,13 +19,14 @@ export function ChartCanvas({
   containerClassName = 'chart-container',
   ariaLabel,
   isLight = false,
+  onFirstRender,
   onCanvasReady,
 }: ChartCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart | null>(null);
 
   useEffect(() => {
-    Chart.defaults.color = isLight ? '#526783' : '#9aaec9';
+    Chart.defaults.color = isLight ? '#513e46' : '#dccbd1';
     Chart.defaults.borderColor = isLight ? '#d9e4f2' : '#2a3954';
     if (chartRef.current) {
       chartRef.current.update();
@@ -41,12 +43,23 @@ export function ChartCanvas({
       chartRef.current = null;
     }
 
-    Chart.defaults.color = isLight ? '#526783' : '#9aaec9';
+    Chart.defaults.color = isLight ? '#513e46' : '#dccbd1';
     Chart.defaults.borderColor = isLight ? '#d9e4f2' : '#2a3954';
+
+    const started = performance.now();
+    let firstRender = true;
+    const renderTiming: Plugin = {
+      id: 'comparisonRenderTiming',
+      afterRender() {
+        if (!firstRender) return;
+        firstRender = false;
+        onFirstRender?.(performance.now() - started);
+      },
+    };
 
     chartRef.current = new Chart(canvas, {
       ...config,
-      plugins,
+      plugins: onFirstRender ? [...(plugins ?? []), renderTiming] : plugins,
     });
 
     return () => {
@@ -56,7 +69,7 @@ export function ChartCanvas({
       }
       onCanvasReady?.(null);
     };
-  }, [config, plugins, onCanvasReady, isLight]);
+  }, [config, plugins, onCanvasReady, onFirstRender, isLight]);
 
   return (
     <div className={containerClassName}>

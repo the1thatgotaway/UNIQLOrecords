@@ -39,7 +39,6 @@ interface OverviewSectionProps {
   statusMessage: string;
   statusType: '' | 'success' | 'warning' | 'error';
   alertMessage: string;
-  isReloading: boolean;
   onSearchChange: (val: string) => void;
   onSkuChange: (val: string) => void;
   onFromDateChange: (val: string) => void;
@@ -47,12 +46,11 @@ interface OverviewSectionProps {
   onSortOrderChange: (val: OverviewSortOrder) => void;
   onGroupingChange: (val: 'month' | 'week' | 'day') => void;
   onClearFilters: () => void;
-  onReloadRecords: () => void;
   onOpenGemini: (task: LlmAnalysisTask | null) => void;
 }
 
 const OVERVIEW_COLORS = [
-  '#e5ff7a',
+  '#cf493a',
   '#76baff',
   '#ff9e77',
   '#b5a1ff',
@@ -90,7 +88,6 @@ export function OverviewSection({
   statusMessage,
   statusType,
   alertMessage,
-  isReloading,
   onSearchChange,
   onSkuChange,
   onFromDateChange,
@@ -98,7 +95,6 @@ export function OverviewSection({
   onSortOrderChange,
   onGroupingChange,
   onClearFilters,
-  onReloadRecords,
   onOpenGemini,
 }: OverviewSectionProps) {
   const [page, setPage] = useState(1);
@@ -148,10 +144,10 @@ export function OverviewSection({
     return { groupedLabels: labels, groupedValues: values, rankedProducts: ranked, peakPeriod: peak };
   }, [filteredRows, grouping]);
 
-  const axisTickColor = isLight ? '#526783' : '#9aacbf';
+  const axisTickColor = isLight ? '#513e46' : '#dccbd1';
   const gridColor = isLight ? '#d9e4f280' : '#ffffff12';
-  const barLabelColor = isLight ? '#19242b' : '#aebdd0';
-  const legendLabelColor = isLight ? '#35485a' : '#b9c9dc';
+  const barLabelColor = isLight ? '#302128' : '#f3e2e7';
+  const legendLabelColor = isLight ? '#49343c' : '#eedce3';
   const donutBorder = isLight ? '#ffffff' : '#0a1220';
 
   const trendConfig = useMemo<ChartConfiguration>(
@@ -163,8 +159,8 @@ export function OverviewSection({
           {
             label: 'Net sales',
             data: groupedValues,
-            borderColor: isLight ? '#527200' : '#e5ff7a',
-            backgroundColor: isLight ? 'rgba(82,114,0,0.09)' : 'rgba(229,255,122,.09)',
+            borderColor: isLight ? '#b32020' : '#cf493a',
+            backgroundColor: isLight ? 'rgba(180,19,44,.09)' : 'rgba(226,50,75,.15)',
             fill: true,
             borderWidth: 3,
             tension: 0.3,
@@ -339,37 +335,28 @@ export function OverviewSection({
       row.gross_unit_price,
       row.net_sales_collected,
     ]);
-    downloadBlob(buildCsvDocument(heading, data), 'uniqlo-all-sales-records.csv');
+    downloadBlob(buildCsvDocument(heading, data), 'uniqlick-all-sales-records.csv');
   };
 
   const handleExportAnomalies = () => {
     if (!visibleAnomalies.length) return;
     const header = ['Severity', 'Sale / Period', 'Date', 'Product SKU', 'Anomaly type', 'Explanation'];
     const data = visibleAnomalies.map((a) => [a.severity, a.id, a.date, a.sku, a.type, a.reason]);
-    downloadBlob(buildCsvDocument(header, data), 'uniqlo-sales-anomaly-flags.csv');
+    downloadBlob(buildCsvDocument(header, data), 'uniqlick-sales-anomaly-flags.csv');
   };
 
   return (
     <section id="overview" aria-labelledby="overviewHeading">
       <div className="full-dash-title">
         <div>
-          <span className="overview-eyebrow">UNIQLO / SALES DATABASE</span>
-          <h2 id="overviewHeading">All Sales Records</h2>
+          <span className="overview-eyebrow">UniQlick / SALES DATABASE</span>
+          <h2 id="overviewHeading">Executive Dashboard</h2>
           <p>
             Complete transaction overview from Supabase — every accessible record, not only the four
             analysis filters.
           </p>
         </div>
         <div className="full-dash-actions">
-          <button
-            id="overviewRefresh"
-            className="action-btn"
-            type="button"
-            disabled={isReloading}
-            onClick={onReloadRecords}
-          >
-            {isReloading ? '⟳ Syncing…' : '↻ Reload records'}
-          </button>
           <button
             id="overviewExport"
             className="action-btn primary"
@@ -562,7 +549,7 @@ export function OverviewSection({
             />
             <div className="graph-explanation" id="overviewExplainTrend" aria-live="polite">
               {filteredRows.length
-                ? `Explanation: This ${intervalLabel} chart adds up net revenue from the ${formatNumber(
+                ? `This ${intervalLabel} chart adds up net revenue from the ${formatNumber(
                     filteredRows.length
                   )} currently selected sales. ${
                     peakPeriod
@@ -589,7 +576,7 @@ export function OverviewSection({
             />
             <div className="graph-explanation" id="overviewExplainProducts" aria-live="polite">
               {topProduct
-                ? `Explanation: Products are ranked by total net sales, not transaction quantity. ${topProduct[0]} currently leads with ${formatMoney(
+                ? `Products are ranked by total net sales, not transaction quantity. ${topProduct[0]} currently leads with ${formatMoney(
                     topProduct[1]
                   )}. Search, date, and product filters affect this ranking.`
                 : 'No matching product revenue to rank.'}
@@ -610,7 +597,7 @@ export function OverviewSection({
             />
             <div className="graph-explanation" id="overviewExplainShare" aria-live="polite">
               {totalSales > 0
-                ? `Explanation: Each slice represents a product’s portion of ${formatMoney(
+                ? `Each slice represents a product’s portion of ${formatMoney(
                     totalSales
                   )} in filtered net sales. The smaller categories are grouped as Other products. This does not represent profit margins.`
                 : 'No positive sales revenue is available for a distribution chart.'}
@@ -701,7 +688,7 @@ export function OverviewSection({
               className="action-btn"
               onClick={() => onOpenGemini('anomaly-explanation')}
             >
-              ✦ Explain flags with Gemini
+              ✦ Explain flags with Groq
             </button>
           </div>
 
@@ -913,8 +900,8 @@ export function OverviewSection({
 
           <p className="overview-footnote">
             Dates are read directly from <code>fact_sales.date_key</code> and{' '}
-            <code>dim_date.full_date</code>. The companion SQL repair distributes simulated dates
-            from <strong>January 1, 2024 through September 26, 2026</strong> (inclusive). These
+            <code>dim_date.full_date</code>. The exam dataset spans dates
+            from <strong>January 1, 2024 through November 25, 2026</strong> (inclusive). These
             are <strong>simulated dates</strong>, not recovered historical sale dates. Search, KPIs,
             charts, and exports reflect the current database values.
           </p>

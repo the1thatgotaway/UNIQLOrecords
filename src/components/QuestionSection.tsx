@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ChartConfiguration, Plugin } from 'chart.js/auto';
 import type {
   FocusedQuestionId,
@@ -29,22 +29,23 @@ import {
   describeStudioGraph,
   explainTrendSummary,
 } from '../utils/isolationForest.ts';
-import { buildCsvDocument, parseMidtermSnapshot } from '../utils/snapshotParser.ts';
+import { buildCsvDocument } from '../utils/snapshotParser.ts';
 import { ChartCanvas } from './ChartCanvas.tsx';
 
 interface QuestionSectionProps {
   questionId: FocusedQuestionId;
   rows: SalesRecord[];
-  midtermSnapshot: MidtermSnapshot | null;
+  midtermSnapshot: Pick<MidtermSnapshot, 'captured_at' | 'baseline' | 'scenarios'>;
   totalOverviewCount: number;
   isLight: boolean;
   statusTime: string;
-  onMidtermLoaded: (snap: MidtermSnapshot, fileName: string) => void;
-  midtermStatusLabel: string;
+  salesTiming: { requestMs: number; supabaseMs: number | null } | null;
+  isReloading: boolean;
+  onReloadRecords: () => void;
   onOpenGemini: (task: LlmAnalysisTask | null) => void;
 }
 
-const STUDIO_PALETTE = ['#c7f26b', '#6db8ff', '#ffab7b', '#b29bff'];
+const STUDIO_PALETTE = ['#ef766e', '#6db8ff', '#ffab7b', '#b29bff'];
 
 const thresholdPlugin: Plugin = {
   id: 'thresholdLine',
@@ -68,6 +69,10 @@ const thresholdPlugin: Plugin = {
     ctx.restore();
   },
 };
+
+function formatTiming(value: number | null | undefined): string {
+  return value == null ? '—' : value.toFixed(1) + ' ms';
+}
 
 function changeText(oldVal: number, newVal: number, formatter: (v: number) => string): string {
   const diff = newVal - oldVal;
@@ -93,21 +98,26 @@ export function QuestionSection({
   totalOverviewCount,
   isLight,
   statusTime,
-  onMidtermLoaded,
-  midtermStatusLabel,
+  salesTiming,
+  isReloading,
+  onReloadRecords,
   onOpenGemini,
 }: QuestionSectionProps) {
   const qNum = Number(questionId);
   const [viewMode, setViewMode] = useState<StudioChartView>('trend');
-  const [grouping, setGrouping] = useState<GroupingMode>('day');
+  const [grouping, setGrouping] = useState<GroupingMode>(questionId === '4' ? 'day' : 'month');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [tableSearch, setTableSearch] = useState('');
   const [tablePageSize, setTablePageSize] = useState(25);
   const [tablePage, setTablePage] = useState(1);
-  const [midError, setMidError] = useState('');
   const [mlRunTick, setMlRunTick] = useState(0);
   const primaryCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const savePrimaryCanvas = useCallback((canvas: HTMLCanvasElement | null) => {
+    primaryCanvasRef.current = canvas;
+  }, []);
+  const [midtermRender, setMidtermRender] = useState<{ config: ChartConfiguration; ms: number }>();
+  const [finalsRender, setFinalsRender] = useState<{ config: ChartConfiguration; ms: number }>();
 
   const summaryStats = useMemo(() => {
     const net = metricSum(rows, 'net_sales_collected');
@@ -189,8 +199,8 @@ export function QuestionSection({
   }, [filteredChartRows, grouping, viewMode, questionId, mlRunTick]);
 
   const flaggedSet = useMemo(() => new Set(mlResult.indices), [mlResult.indices]);
-  const accentStroke = isLight && qNum === 1 ? '#527200' : STUDIO_PALETTE[(qNum - 1) % 4];
-  const tickColor = isLight ? '#526783' : '#93a4bb';
+  const accentStroke = isLight && qNum === 1 ? '#b32020' : STUDIO_PALETTE[(qNum - 1) % 4];
+  const tickColor = isLight ? '#513e46' : '#dccbd1';
   const gridColor = isLight ? '#d9e4f280' : '#ffffff12';
 
   const { primaryConfig, midtermConfig, compareNotes } = useMemo(() => {
@@ -257,27 +267,7 @@ export function QuestionSection({
         position: 'right',
         beginAtZero: true,
         grid: { drawOnChartArea: false },
-        ticks: { color: '#ffab7b' },
-      };
-    }
-
-    if (!midtermSnapshot) {
-      return {
-        primaryConfig: {
-          type: chartType,
-          data: { labels: [...labels], datasets },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: viewMode === 'mix', labels: { color: tickColor } },
-              tooltip: { mode: 'index', intersect: false },
-            },
-            scales: baseScales,
-          },
-        } as ChartConfiguration,
-        midtermConfig: null as ChartConfiguration | null,
-        compareNotes: [] as string[],
+        ticks: { color: isLight ? '#8a461e' : '#ffc5a1' },
       };
     }
 
@@ -463,6 +453,13 @@ export function QuestionSection({
     totalOverviewCount,
   ]);
 
+  const recordMidtermRender = useCallback((ms: number) => {
+    setMidtermRender({ config: midtermConfig, ms });
+  }, [midtermConfig]);
+  const recordFinalsRender = useCallback((ms: number) => {
+    setFinalsRender({ config: primaryConfig, ms });
+  }, [primaryConfig]);
+
   const activePlugins = useMemo(
     () => (qNum === 1 && viewMode === 'price' ? [thresholdPlugin] : undefined),
     [qNum, viewMode]
@@ -512,20 +509,6 @@ export function QuestionSection({
   const tableStart = (safeTablePage - 1) * tablePageSize;
   const pagedTableRows = sortedTableRows.slice(tableStart, tableStart + tablePageSize);
 
-  const handleMidtermFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const snapshot = parseMidtermSnapshot(await file.text());
-      setMidError('');
-      onMidtermLoaded(snapshot, file.name);
-    } catch (err) {
-      setMidError(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      e.target.value = '';
-    }
-  };
-
   const handleExportAiReport = () => {
     if (mlResult.reason) return;
     const headers = [
@@ -554,7 +537,7 @@ export function QuestionSection({
     ]);
     downloadFile(
       buildCsvDocument(headers, body, summaryLine),
-      `uniqlo-question-${questionId}-ai-graph-report.csv`
+      `uniqlick-question-${questionId}-ai-graph-report.csv`
     );
   };
 
@@ -612,7 +595,7 @@ export function QuestionSection({
         row.net_sales_collected,
       ];
     });
-    downloadFile(buildCsvDocument(headers, body), `uniqlo-question-${questionId}-sales.csv`);
+    downloadFile(buildCsvDocument(headers, body), `uniqlick-question-${questionId}-sales.csv`);
   };
 
   return (
@@ -657,7 +640,7 @@ export function QuestionSection({
       </div>
 
       <div id={`status${questionId}`} className="status success" role="status" aria-live="polite">
-        {`Loaded ${formatNumber(rows.length)} matching records from the offline snapshot · ${statusTime}`}
+        {`Loaded ${formatNumber(rows.length)} matching records from Live Supabase · ${statusTime}`}
       </div>
 
       <div id={`summary${questionId}`} className="summary-grid">
@@ -767,7 +750,7 @@ export function QuestionSection({
                 setFromDate('');
                 setToDate('');
                 setViewMode('trend');
-                setGrouping('day');
+                setGrouping(questionId === '4' ? 'day' : 'month');
               }}
             >
               Reset filters
@@ -781,7 +764,7 @@ export function QuestionSection({
                 if (!canvas) return;
                 const a = document.createElement('a');
                 a.href = canvas.toDataURL('image/png');
-                a.download = `uniqlo-sales-question-${questionId}-graph.png`;
+                a.download = `uniqlick-sales-question-${questionId}-graph.png`;
                 a.click();
               }}
             >
@@ -822,36 +805,24 @@ export function QuestionSection({
           {qNum === 4 && (
             <p className="description">Daily net sales for UQ-BAG-01 under PROMO-LIMITED.</p>
           )}
-          <label className="description">
-            Midterm comparison · import the step 02 JSON or CSV{' '}
-            <input
-              type="file"
-              id={`midInput${questionId}`}
-              accept=".csv,.json,.txt"
-              onChange={handleMidtermFile}
-            />
-          </label>
-          <p id={`importStatus${questionId}`} role="status">
-            {midError || midtermStatusLabel}
-          </p>
+          <h3>Midterm vs. Finals comparison</h3>
 
           <div className="exam-pair">
-            <div id={`midPane${questionId}`} hidden={!midtermConfig}>
+            <div id={`midPane${questionId}`}>
               <h3>Saved Midterm</h3>
-              {midtermConfig && (
-                <ChartCanvas
-                  id={`midChart${questionId}`}
-                  containerClassName="chart-container"
-                  config={midtermConfig}
-                  plugins={activePlugins}
-                  ariaLabel={`Saved Midterm Question ${questionId} chart`}
-                  isLight={isLight}
-                />
-              )}
+              <ChartCanvas
+                id={`midChart${questionId}`}
+                containerClassName="chart-container"
+                config={midtermConfig}
+                onFirstRender={recordMidtermRender}
+                plugins={activePlugins}
+                ariaLabel={`Saved Midterm Question ${questionId} chart`}
+                isLight={isLight}
+              />
             </div>
             <div>
               <h3 id={`currentLabel${questionId}`} hidden={!midtermConfig}>
-                Current database
+                Finals · Live Supabase
               </h3>
               <ChartCanvas
                 id={qNum === 2 ? 'chart2a' : `chart${questionId}`}
@@ -860,12 +831,38 @@ export function QuestionSection({
                 plugins={activePlugins}
                 ariaLabel={`Question ${questionId} studio chart`}
                 isLight={isLight}
-                onCanvasReady={(c) => {
-                  primaryCanvasRef.current = c;
-                }}
+                onCanvasReady={savePrimaryCanvas}
+                onFirstRender={recordFinalsRender}
               />
             </div>
           </div>
+
+          <details className="comparison-timing">
+            <summary>Comparison timings</summary>
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr><th scope="col">Measurement</th><th scope="col">Saved Midterm</th><th scope="col">Live Finals</th></tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">Supabase retrieval</th><td>Bundled data</td><td>{formatTiming(salesTiming?.supabaseMs)}</td></tr>
+                  <tr><th scope="row">Browser data request</th><td>Bundled data</td><td>{formatTiming(salesTiming?.requestMs)}</td></tr>
+                  <tr>
+                    <th scope="row">Chart render</th>
+                    <td>{formatTiming(midtermRender?.config === midtermConfig ? midtermRender.ms : null)}</td>
+                    <td>{formatTiming(finalsRender?.config === primaryConfig ? finalsRender.ms : null)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="description">
+              All four scenarios share one paginated Supabase load. Chart times measure each chart
+              separately through its first completed draw, including animation.
+            </p>
+            <button type="button" className="action-btn" disabled={isReloading} onClick={onReloadRecords}>
+              {isReloading ? 'Refreshing live data…' : 'Refresh live data and timings'}
+            </button>
+          </details>
 
           <div id={`compareNotes${questionId}`} aria-live="polite">
             {compareNotes.map((msg, idx) => (
@@ -885,7 +882,7 @@ export function QuestionSection({
               className="action-btn llm-inline-btn"
               onClick={() => onOpenGemini('scenario-deep-dive')}
             >
-              ✦ Ask Gemini AI
+              ✦ Ask Scout
             </button>
           </div>
           <p id={`graphExplain${questionId}`} className="description">
@@ -893,10 +890,10 @@ export function QuestionSection({
           </p>
         </div>
 
-        <div className="card ai-question-card" id={`aiPanel${questionId}`} aria-live="polite">
+        <div className="card ai-question-card" id={`aiPanel${questionId}`} tabIndex={-1} aria-live="polite">
           <div className="ai-question-head">
             <div className="ai-head-copy">
-              <span className="ai-eyebrow">{`UNIQLO / MACHINE LEARNING / QUESTION ${questionId}`}</span>
+              <span className="ai-eyebrow">{`UniQlick / MACHINE LEARNING / QUESTION ${questionId}`}</span>
               <h2>AI Graph Analysis</h2>
               <p>Finds unusual patterns in this question’s graph.</p>
             </div>
@@ -936,7 +933,7 @@ export function QuestionSection({
                 className="action-btn"
                 onClick={() => onOpenGemini('anomaly-explanation')}
               >
-                ✦ Explain with Gemini
+                ✦ Explain with Groq
               </button>
             </div>
           </div>

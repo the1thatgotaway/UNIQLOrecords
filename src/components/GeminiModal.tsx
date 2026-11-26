@@ -1,3 +1,4 @@
+import { ArrowUp, Maximize2, MessageCircle, Minimize2, Minus, RotateCcw, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   LlmAnalysisResult,
@@ -5,6 +6,10 @@ import type {
   LlmChatMessage,
   LlmContextPayload,
 } from '../types/sales.ts';
+import type { SalesFilters, SalesLookupResult } from '../types/salesLookup.ts';
+import { SalesLookupTable } from './SalesLookupTable.tsx';
+import { answerFromDashboard } from '../utils/dashboardAnswers.ts';
+import { buildDashboardBriefing } from '../utils/dashboardBriefing.ts';
 import {
   clearPersistedChatHistory,
   loadPersistedChatHistory,
@@ -32,6 +37,18 @@ const SUGGESTED_QUESTIONS = [
   'Explain the current sales anomalies.',
 ];
 
+async function fetchSalesLookup(body: object): Promise<SalesLookupResult | null> {
+  const response = await fetch('/api/sales-assistant/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (response.status === 204) return null;
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Sales lookup failed.');
+  return data as SalesLookupResult;
+}
+
 export function GeminiModal({
   isOpen,
   initialTask,
@@ -47,13 +64,21 @@ export function GeminiModal({
   const [messages, setMessages] = useState<LlmChatMessage[]>(() => loadPersistedChatHistory());
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
+  const [checkingSales, setCheckingSales] = useState(false);
+  const [lookup, setLookup] = useState<SalesLookupResult | null>(null);
+  const [pagingLookup, setPagingLookup] = useState(false);
+  const lastFilters = useRef<SalesFilters | undefined>(undefined);
   const [error, setError] = useState('');
   const [minimized, setMinimized] = useState(false);
-  const [suggestionsExpanded, setSuggestionsExpanded] = useState(true);
+  const [suggestionsExpanded, setSuggestionsExpanded] = useState<boolean | null>(null);
+  const [wide, setWide] = useState(false);
+  const showSuggestions = suggestionsExpanded ?? messages.length === 0;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoScrollRef = useRef(true);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const analysisPending = useRef(false);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     if (messagesEndRef.current) {
@@ -78,7 +103,10 @@ export function GeminiModal({
   }, [messages]);
 
   const runAnalysis = async (task: LlmAnalysisTask) => {
+    if (analysisPending.current) return;
+    analysisPending.current = true;
     setAnalyzing(true);
+    setAnalysis(null);
     setActiveTask(task);
     setMode('briefing');
     setError('');
@@ -87,20 +115,25 @@ export function GeminiModal({
       const res = await fetch('/api/llm/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task, context: contextPayload }),
+        body: JSON.stringify({ task, context: {
+          ...contextPayload,
+          sampleRecords: [],
+          anomalySummary: {
+            ...contextPayload.anomalySummary,
+            topFlags: contextPayload.anomalySummary.topFlags.slice(0, 5),
+          },
+          mlGraphFlags: contextPayload.mlGraphFlags.slice(0, 5),
+        } }),
       });
       const data = (await res.json()) as LlmAnalysisResult & { error?: string };
       if (!res.ok) {
         throw new Error(data.error || `Request failed (${res.status})`);
       }
       setAnalysis(data);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Unable to run Gemini analysis. Please try again in a moment.'
-      );
+    } catch {
+      setAnalysis(buildDashboardBriefing(task, contextPayload));
     } finally {
+      analysisPending.current = false;
       setAnalyzing(false);
     }
   };
@@ -129,25 +162,25 @@ export function GeminiModal({
 
   useEffect(() => {
     if (!isOpen || minimized) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setMinimized(true);
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, minimized, onClose]);
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    dialog.showModal();
+    return () => dialog.close();
+  }, [isOpen, minimized]);
 
   const sendQuestion = async (rawQuestion: string) => {
     const question = rawQuestion.trim();
     if (!question || streaming) return;
 
     setMode('chat');
+    setLookup(null);
     setError('');
     setInput('');
     shouldAutoScrollRef.current = true;
-    const historyPayload = messages.map((m) => ({ role: m.role, content: m.content }));
+    const historyPayload = messages.slice(-4).map((m) => ({
+      role: m.role,
+      content: m.content.slice(0, 1000),
+    }));
     const nowTime = new Date().toLocaleTimeString('en-PH', {
       hour: 'numeric',
       minute: '2-digit',
@@ -157,6 +190,13 @@ export function GeminiModal({
       content: question,
       timestamp: nowTime,
     };
+    const dashboardAnswer = answerFromDashboard(question, contextPayload);
+    if (dashboardAnswer) {
+      setMessages(prev => [...prev, userMsg, {
+        role: 'assistant', content: dashboardAnswer, timestamp: nowTime,
+      }]);
+      return;
+    }
     const assistantMsg: LlmChatMessage = {
       role: 'assistant',
       content: '',
@@ -164,8 +204,23 @@ export function GeminiModal({
     };
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setStreaming(true);
+    setCheckingSales(true);
 
     try {
+      const result = await fetchSalesLookup({ question, previousFilters: lastFilters.current });
+      setCheckingSales(false);
+      if (result) {
+        lastFilters.current = result.filters;
+        setLookup(result);
+        const summary = result.count
+          ? `Found ${formatNumber(result.count)} matching sales in live Supabase.`
+          : 'No matching sales were found in live Supabase.';
+        setMessages(prev => [...prev.slice(0, -1), {
+          ...assistantMsg,
+          content: `${summary}\nFilters: ${result.explanation}`,
+        }]);
+        return;
+      }
       const res = await fetch('/api/llm/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -180,7 +235,7 @@ export function GeminiModal({
         const bodyErr = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(
           bodyErr.error ||
-            `Gemini AI service returned status ${res.status}. Please check server settings or retry.`
+            `Groq chat returned status ${res.status}. Please check server settings or retry.`
         );
       }
 
@@ -226,21 +281,39 @@ export function GeminiModal({
       }
 
       if (!accumulated.trim()) {
-        throw new Error('Gemini returned an empty response. Please try asking again.');
+        throw new Error('Groq returned an empty response. Please try asking again.');
       }
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Unable to reach Gemini AI right now. Verify your connection or try again.'
+          : 'Unable to reach Groq chat right now. Verify your connection or try again.'
       );
       setMessages((prev) => prev.filter((_, idx) => idx !== prev.length - 1 || prev[idx].content));
     } finally {
+      setCheckingSales(false);
       setStreaming(false);
     }
   };
 
+  const showLookupPage = async (offset: number) => {
+    if (!lookup || pagingLookup) return;
+    const current = lookup;
+    setPagingLookup(true);
+    setError('');
+    try {
+      const page = await fetchSalesLookup({ filters: current.filters, offset });
+      if (page) setLookup(latest => latest === current ? page : latest);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load the requested page.');
+    } finally {
+      setPagingLookup(false);
+    }
+  };
+
   const handleClearChat = () => {
+    lastFilters.current = undefined;
+    setLookup(null);
     if (streaming) return;
     setMessages([]);
     clearPersistedChatHistory();
@@ -278,30 +351,28 @@ export function GeminiModal({
           onClick={handleLauncherClick}
           aria-label={
             userTurnCount > 0
-              ? `Open UNIQLO Sales Assistant (${userTurnCount} saved questions)`
-              : 'Open UNIQLO Sales Assistant'
+              ? `Open Scout (${userTurnCount} saved questions)`
+              : 'Open Scout'
           }
         >
-          <span className="chatbot-launcher-mark" aria-hidden="true">
-            ✦
-          </span>
-          <span className="chatbot-launcher-label">
-            {userTurnCount > 0 ? `Sales Assistant (${userTurnCount})` : 'Sales Assistant'}
-          </span>
+          <MessageCircle size={22} strokeWidth={1.6} aria-hidden="true" />
         </button>
       )}
 
       {isOpen && !minimized && (
-        <div
-          className="chatbot-panel"
-          role="dialog"
-          aria-modal="false"
+        <dialog
+          ref={dialogRef}
+          className={`chatbot-panel${wide ? ' chatbot-panel-wide' : ''}`}
+          onCancel={(event) => {
+            event.preventDefault();
+            handleClose();
+          }}
           aria-labelledby="llmModalTitle"
         >
           <div className="llm-modal-header">
+            <span className="llm-header-mark" aria-hidden="true"><MessageCircle size={20} strokeWidth={1.6} /></span>
             <div className="llm-header-copy">
-              <div className="ai-eyebrow">SALES ANALYTICS GUIDE</div>
-              <h2 id="llmModalTitle">UNIQLO Sales Assistant</h2>
+              <h2 id="llmModalTitle">Scout</h2>
               <p className="llm-scope-line">
                 {contextPayload.viewLabel} ·{' '}
                 {contextPayload.isFiltered
@@ -323,7 +394,16 @@ export function GeminiModal({
                 title="Clear saved conversation"
                 aria-label="Clear saved conversation"
               >
-                ↺ Clear
+                <RotateCcw size={15} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="llm-icon-btn llm-width-btn"
+                onClick={() => setWide((expanded) => !expanded)}
+                title={wide ? 'Restore panel width' : 'Expand panel for sales tables'}
+                aria-label={wide ? 'Restore panel width' : 'Expand panel for sales tables'}
+              >
+                {wide ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
               </button>
               <button
                 type="button"
@@ -331,9 +411,9 @@ export function GeminiModal({
                 className="llm-icon-btn"
                 onClick={handleMinimize}
                 title="Minimize chat"
-                aria-label="Minimize Sales Assistant"
+                aria-label="Minimize Scout"
               >
-                —
+                <Minus size={16} aria-hidden="true" />
               </button>
               <button
                 type="button"
@@ -341,14 +421,14 @@ export function GeminiModal({
                 className="llm-icon-btn"
                 onClick={handleClose}
                 title="Close chat"
-                aria-label="Close Sales Assistant"
+                aria-label="Close Scout"
               >
-                ✕
+                <X size={16} aria-hidden="true" />
               </button>
             </div>
           </div>
 
-          <div className="chatbot-mode-bar" role="tablist" aria-label="Sales Assistant Modes">
+          <div className="chatbot-mode-bar" role="tablist" aria-label="Scout Modes">
             <button
               type="button"
               role="tab"
@@ -431,7 +511,9 @@ export function GeminiModal({
                   </div>
                 ) : analysis ? (
                   <div className="llm-section-card">
-                    <div className="explanation-kicker">{`GEMINI STRUCTURED OUTPUT · ${analysis.model}`}</div>
+                    <div className="explanation-kicker">{analysis.model === 'Dashboard data'
+                      ? 'DASHBOARD BRIEFING'
+                      : `GROQ BRIEFING · ${analysis.model}`}</div>
                     <h3>{analysis.headline}</h3>
                     <div className="ai-narrative">{analysis.executiveSummary}</div>
 
@@ -484,25 +566,12 @@ export function GeminiModal({
               </>
             ) : (
               <>
-                <div className="llm-welcome-card">
-                  <div className="llm-welcome-head">
-                    <span className="llm-msg-role">SYSTEM &amp; DATA GUIDE</span>
-                    {messages.length > 0 && (
-                      <span className="chatbot-saved-note">History saved</span>
-                    )}
+                {messages.length === 0 && (
+                  <div className="llm-welcome-card llm-chat-welcome">
+                    <h3>What would you like to find?</h3>
+                    <p>Find sales records or ask about trends, dashboard views, and anomalies in English, Filipino, or Taglish.</p>
                   </div>
-                  <p>
-                    Ask about navigating dashboards, importing snapshots, <strong>IQR</strong> or{' '}
-                    <strong>Isolation Forest</strong> alerts, or sales trends in{' '}
-                    <strong>English, Filipino, or Taglish</strong>.
-                  </p>
-                  <div className="llm-welcome-meta">
-                    Active view: <strong>{contextPayload.viewLabel}</strong> ({formatNumber(
-                      contextPayload.kpis.recordCount
-                    )}{' '}
-                    shown / {formatNumber(contextPayload.overallSummary.totalLoadedCount)} total)
-                  </div>
-                </div>
+                )}
 
                 <div className="llm-suggestions-wrap">
                   <div className="llm-suggestions-head">
@@ -510,12 +579,13 @@ export function GeminiModal({
                     <button
                       type="button"
                       className="llm-text-toggle"
-                      onClick={() => setSuggestionsExpanded((s) => !s)}
+                      aria-expanded={showSuggestions}
+                      onClick={() => setSuggestionsExpanded(!showSuggestions)}
                     >
-                      {suggestionsExpanded ? 'Hide' : 'Show'}
+                      {showSuggestions ? 'Hide' : 'Show'}
                     </button>
                   </div>
-                  {suggestionsExpanded && (
+                  {showSuggestions && (
                     <div className="llm-chips">
                       {SUGGESTED_QUESTIONS.map((q) => (
                         <button
@@ -539,15 +609,15 @@ export function GeminiModal({
                     return (
                       <div key={i} className={`llm-msg ${msg.role}`}>
                         <div className="llm-msg-role">
-                          {msg.role === 'user' ? 'You' : 'Sales Assistant'}
+                          {msg.role === 'user' ? 'You' : 'Scout'}
                           {msg.timestamp ? ` · ${msg.timestamp}` : ''}
                         </div>
                         {isTyping ? (
-                          <div className="chatbot-typing" aria-label="Sales Assistant is typing">
+                          <div className="chatbot-typing" aria-label="Scout is typing">
                             <span className="typing-dot" />
                             <span className="typing-dot" />
                             <span className="typing-dot" />
-                            <span className="typing-label">Thinking…</span>
+                            <span className="typing-label">{checkingSales ? 'Checking live sales…' : 'Thinking…'}</span>
                           </div>
                         ) : (
                           <div className="llm-msg-body">
@@ -567,6 +637,7 @@ export function GeminiModal({
                     );
                   })}
                 </div>
+                {lookup && <SalesLookupTable result={lookup} loading={pagingLookup} onPage={showLookupPage} />}
               </>
             )}
             <div ref={messagesEndRef} className="chatbot-scroll-anchor" aria-hidden="true" />
@@ -592,18 +663,19 @@ export function GeminiModal({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={streaming}
-                aria-label="Ask UNIQLO Sales Assistant a question"
+                aria-label="Ask Scout a question"
               />
               <button
                 type="submit"
                 className="action-btn primary"
                 disabled={streaming || !input.trim()}
               >
+                <ArrowUp size={16} aria-hidden="true" />
                 {streaming ? 'Sending…' : 'Send'}
               </button>
             </form>
           </div>
-        </div>
+        </dialog>
       )}
     </>
   );

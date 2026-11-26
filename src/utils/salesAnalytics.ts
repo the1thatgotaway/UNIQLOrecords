@@ -25,7 +25,7 @@ export const SCENARIO_META: Record<
   overview: {
     code: '00',
     shortTitle: 'All Sales',
-    title: 'All Sales Dashboard',
+    title: 'Executive Dashboard',
     subtitle: 'Full fact_sales ledger across products, stores, and promotions',
     description:
       'Complete transaction ledger with live search, product filtering, revenue trends, statistical IQR audit, and Gemini AI executive intelligence.',
@@ -265,13 +265,13 @@ export function detectSalesAnomalies(rows: SalesRecord[]): AnomalyFlag[] {
     if (
       !validRaw ||
       (date && rawKey !== date.replaceAll('-', '')) ||
-      (date && (date < '2024-01-01' || date > '2026-09-26'))
+      (date && (date < '2024-01-01' || date > '2026-11-25'))
     ) {
       const issue = !validRaw
         ? 'Missing or malformed date_key.'
         : date && rawKey !== date.replaceAll('-', '')
           ? 'Date key and linked full_date do not match.'
-          : 'Date falls outside the requested simulation range (2024-01-01 to 2026-09-26).';
+          : 'Date falls outside the requested simulation range (2024-01-01 to 2026-11-25).';
       flags.push({
         id,
         date: date || '—',

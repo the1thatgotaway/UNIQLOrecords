@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import rawSalesData from './data/offlineSales.json';
+import { Activity, ArrowDown, ArrowUpRight, LayoutDashboard, Moon, Store, Sun, Tag, TrendingUp, Users } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import rawMidtermRows from './data/offlineSales.json';
 import type {
   FocusedQuestionId,
   LlmAnalysisTask,
@@ -19,26 +20,58 @@ import {
   skuOf,
 } from './utils/salesAnalytics.ts';
 import { computeIsolationForest } from './utils/isolationForest.ts';
-import { parseImportedSnapshot, SUPABASE_SNAPSHOT_SQL } from './utils/snapshotParser.ts';
+import { parseImportedSnapshot } from './utils/snapshotParser.ts';
 import { OverviewSection } from './components/OverviewSection.tsx';
 import { QuestionSection } from './components/QuestionSection.tsx';
 import { GeminiModal } from './components/GeminiModal.tsx';
 
-const INITIAL_ROWS = rawSalesData as SalesRecord[];
-const DEFAULT_SOURCE_NAME = 'November 20, 2026 Midterm snapshot';
+const sourceName = 'Live Supabase';
+const midtermLabel = 'November 20, 2026 Midterm snapshot';
+const midtermRows = rawMidtermRows as SalesRecord[];
+const midtermSnapshot: Pick<MidtermSnapshot, 'captured_at' | 'baseline' | 'scenarios'> = {
+  captured_at: 'November 20, 2026',
+  baseline: midtermRows.length,
+  scenarios: {
+    '1': filterScenarioRows(midtermRows, '1'),
+    '2': filterScenarioRows(midtermRows, '2'),
+    '3': filterScenarioRows(midtermRows, '3'),
+    '4': filterScenarioRows(midtermRows, '4'),
+  },
+};
 
 export default function App() {
-  const [snapshotRows, setSnapshotRows] = useState<SalesRecord[]>(INITIAL_ROWS);
-  const [sourceName, setSourceName] = useState<string>(DEFAULT_SOURCE_NAME);
-  const [activeTab, setActiveTab] = useState<ScenarioId>('overview');
-  const [isLight, setIsLight] = useState<boolean>(false);
-  const [importMessage, setImportMessage] = useState<string>('');
-  const [loadedAt, setLoadedAt] = useState<string>(() =>
-    new Date().toLocaleTimeString('en-PH')
+  const view = new URLSearchParams(window.location.search).get('view');
+  if (view) return <Dashboard />;
+
+  return (
+    <main className="uniqlick-cover">
+      <div className="uniqlick-cover-content">
+        <h1>UniQlick</h1>
+        <p>One Click. Every Sale. Complete Control.</p>
+        <p className="uniqlick-cover-intro">
+          UniQlick helps you understand your retail sales. Track product and store performance, explore customer purchases, and investigate unusual activity.
+        </p>
+        <a className="uniqlick-cover-link" href="?view=dashboard">
+          Open dashboard <ArrowUpRight size={19} aria-hidden="true" />
+        </a>
+      </div>
+      <div className="uniqlick-cover-art" aria-hidden="true">
+        <span>U</span>
+      </div>
+    </main>
   );
+}
+
+function Dashboard() {
+  const [snapshotRows, setSnapshotRows] = useState<SalesRecord[]>([]);
+  const [activeTab, setActiveTab] = useState<ScenarioId>('overview');
+  const [jumpToMining, setJumpToMining] = useState(false);
+  const [isLight, setIsLight] = useState<boolean>(true);
+  const [loadedAt, setLoadedAt] = useState('');
+  const [salesTiming, setSalesTiming] = useState<{ requestMs: number; supabaseMs: number | null } | null>(null);
 
   // Refresh / Sync status feedback (matching SYNC ENGINE v4)
-  const [isReloading, setIsReloading] = useState(false);
+  const [isReloading, setIsReloading] = useState(true);
   const [refreshNotice, setRefreshNotice] = useState<{
     message: string;
     kind: '' | 'warning' | 'error';
@@ -57,10 +90,6 @@ export default function App() {
   const [sortOrder, setSortOrder] = useState<OverviewSortOrder>('id-desc');
   const [overviewGroup, setOverviewGroup] = useState<'month' | 'week' | 'day'>('month');
 
-  // Midterm comparison snapshot
-  const [midtermSnapshot, setMidtermSnapshot] = useState<MidtermSnapshot | null>(null);
-  const [midtermFileName, setMidtermFileName] = useState<string>('');
-
   // Non-invasive Gemini AI Copilot / Chatbot
   const [geminiOpen, setGeminiOpen] = useState(false);
   const [geminiInitialTask, setGeminiInitialTask] = useState<LlmAnalysisTask | null>(null);
@@ -71,6 +100,16 @@ export default function App() {
   useEffect(() => {
     document.body.classList.toggle('light', isLight);
   }, [isLight]);
+
+  useEffect(() => {
+    if (!jumpToMining || !loadedAt || activeTab === 'overview') return;
+    const panel = document.getElementById(`aiPanel${activeTab}`);
+    if (panel) {
+      panel.focus({ preventScroll: true });
+      panel.scrollIntoView({ block: 'start' });
+    }
+    setJumpToMining(false);
+  }, [jumpToMining, loadedAt, activeTab]);
 
   const skuChoices = useMemo(
     () => [...new Set(snapshotRows.map(skuOf).filter(Boolean))].sort(),
@@ -130,13 +169,13 @@ export default function App() {
     return {
       statusMessage: `Loaded ${formatNumber(
         snapshotRows.length
-      )} sales records from the offline snapshot · ${loadedAt}${
+      )} sales records from ${sourceName} · ${loadedAt}${
         oneDate ? ' · Only one distinct date key detected' : ''
       }`,
       statusType: (oneDate ? 'warning' : 'success') as '' | 'success' | 'warning' | 'error',
       alertMessage: notices.join('  '),
     };
-  }, [snapshotRows, loadedAt]);
+  }, [snapshotRows, loadedAt, sourceName]);
 
   const llmContextPayload = useMemo(() => {
     if (activeTab === 'overview') {
@@ -150,22 +189,23 @@ export default function App() {
         filteredRows: overviewFilteredRows,
         allRows: snapshotRows,
         totalLoadedCount: snapshotRows.length,
-        snapshotSource: `Offline · ${sourceName}`,
+        snapshotSource: sourceName,
         filterDescription: parts.length ? parts.join(' · ') : 'All loaded transactions',
         activeGrouping: overviewGroup,
-        midtermLoaded: Boolean(midtermSnapshot),
-        midtermLabel: midtermFileName || undefined,
+        midtermLoaded: true,
+        midtermLabel,
         overallAnomalyCount,
         anomalies: overviewAnomalies,
       });
     }
 
     const qRows = scenarioRowsMap[activeTab];
-    const bucketsMap = groupSales(qRows, 'day');
+    const grouping = activeTab === '4' ? 'day' : 'month';
+    const bucketsMap = groupSales(qRows, grouping);
     const sortedBuckets = [...bucketsMap.keys()]
       .sort()
       .map((k) => bucketsMap.get(k)!);
-    const mlModel = computeIsolationForest(sortedBuckets, activeTab, 'trend', 'day');
+    const mlModel = computeIsolationForest(sortedBuckets, activeTab, 'trend', grouping);
     const qAnomalies = detectSalesAnomalies(qRows);
 
     return buildLlmContextPayload({
@@ -173,11 +213,11 @@ export default function App() {
       filteredRows: qRows,
       allRows: snapshotRows,
       totalLoadedCount: snapshotRows.length,
-      snapshotSource: `Offline · ${sourceName}`,
+      snapshotSource: sourceName,
       filterDescription: SCENARIO_META[activeTab].subtitle,
-      activeGrouping: 'day',
-      midtermLoaded: Boolean(midtermSnapshot),
-      midtermLabel: midtermFileName || undefined,
+      activeGrouping: grouping,
+      midtermLoaded: true,
+      midtermLabel,
       overallAnomalyCount,
       anomalies: qAnomalies,
       mlFlags: mlModel.flags,
@@ -192,43 +232,55 @@ export default function App() {
     snapshotRows,
     sourceName,
     overviewGroup,
-    midtermSnapshot,
-    midtermFileName,
     overallAnomalyCount,
     overviewAnomalies,
     scenarioRowsMap,
   ]);
 
-  const handleReloadSnapshot = () => {
-    if (isReloading) return;
+  const loadLiveSales = useCallback(async (signal?: AbortSignal) => {
     setIsReloading(true);
-    const nowTime = new Date().toLocaleTimeString('en-PH');
-    setLoadedAt(nowTime);
-    const msg = `Reloaded ${formatNumber(snapshotRows.length)} records from Offline · ${sourceName} (${nowTime}).`;
-    setRefreshNotice({ message: msg, kind: '' });
-    setRefreshToast({
-      title: 'Snapshot synchronized',
-      detail: msg,
-      kind: '',
-    });
-    setTimeout(() => setIsReloading(false), 180);
-  };
-
-  const handleOfflineImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
     try {
-      const parsed = parseImportedSnapshot(await file.text());
-      setSnapshotRows(parsed.rows);
-      setSourceName(file.name);
+      const requestStarted = performance.now();
+      const response = await fetch('/api/sales', { signal });
+      const data = await response.text();
+      const requestMs = performance.now() - requestStarted;
+      if (!response.ok) {
+        const error = JSON.parse(data);
+        throw new Error(error.error || 'Could not load live sales.');
+      }
+      const snapshot = parseImportedSnapshot(data);
+      const supabaseDuration = response.headers.get('Server-Timing')?.match(/supabase;dur=([\d.]+)/)?.[1];
+      setSalesTiming({ requestMs, supabaseMs: supabaseDuration ? Number(supabaseDuration) : null });
+      setSnapshotRows(snapshot.rows);
       setLoadedAt(new Date().toLocaleTimeString('en-PH'));
-      setImportMessage(`${parsed.count} records loaded.`);
-      setActiveTab('overview');
+      setRefreshNotice(null);
+      if (!signal) {
+        setRefreshToast({
+          title: 'Live sales loaded',
+          detail: formatNumber(snapshot.count) + ' records loaded from Supabase.',
+          kind: '',
+        });
+      }
     } catch (err) {
-      setImportMessage(err instanceof Error ? err.message : 'Unable to import snapshot.');
+      if (!signal?.aborted) {
+        setRefreshNotice({
+          message: err instanceof Error ? err.message : 'Could not load live sales.',
+          kind: 'error',
+        });
+      }
     } finally {
-      e.target.value = '';
+      if (!signal?.aborted) setIsReloading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadLiveSales(controller.signal);
+    return () => controller.abort();
+  }, [loadLiveSales]);
+
+  const handleReloadRecords = () => {
+    if (!isReloading) void loadLiveSales();
   };
 
   const openGemini = (task: LlmAnalysisTask | null = null) => {
@@ -240,10 +292,12 @@ export default function App() {
   const tabOrder: ScenarioId[] = ['overview', '1', '2', '3', '4'];
 
   const handleTabsKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const next = e.key === 'ArrowRight' || e.key === 'ArrowDown';
+    const previous = e.key === 'ArrowLeft' || e.key === 'ArrowUp';
+    if (!next && !previous) return;
     const currentIdx = tabOrder.indexOf(activeTab);
     const nextIdx =
-      (currentIdx + (e.key === 'ArrowRight' ? 1 : -1) + tabOrder.length) % tabOrder.length;
+      (currentIdx + (next ? 1 : -1) + tabOrder.length) % tabOrder.length;
     setActiveTab(tabOrder[nextIdx]);
     tabRefs.current[nextIdx]?.focus();
     e.preventDefault();
@@ -251,26 +305,25 @@ export default function App() {
 
   return (
     <>
-      <header>
+      <header className="dashboard-header">
         <div className="header-inner">
-          <div>
+          <div className="dashboard-header-brand">
             <div className="brand">
-              <span className="brand-mark">U</span> UNIQLO / SALES MANAGEMENT
+              <span className="brand-mark">U</span> SALES ANALYTICS
             </div>
             <h1>
-              UNIQLO <span>Sales Management Records</span>
+              <span>UniQlick</span>
             </h1>
-            <p>Sales records, visual analytics, and retail performance insights</p>
+            <p>One Click. Every Sale. Complete Control.</p>
           </div>
           <div className="header-actions">
-            <span className="online">SUPABASE DATA CONNECTION</span>
             <button
               id="geminiTrigger"
               className="head-btn"
               type="button"
               onClick={() => openGemini(null)}
             >
-              ✦ Gemini AI
+              ✦ Ask Scout
             </button>
             <button
               id="printReport"
@@ -281,26 +334,15 @@ export default function App() {
               ▤ Print report
             </button>
             <button
-              id="themeToggle"
+              id="refreshData"
               className="head-btn"
               type="button"
-              onClick={() => setIsLight((l) => !l)}
+              title="Load the latest sales from Supabase"
+              disabled={isReloading}
+              onClick={handleReloadRecords}
             >
-              {isLight ? '☾ Dark mode' : '☀ Light mode'}
+              {isReloading ? '⟳ Syncing…' : '↻ Reload records'}
             </button>
-            <div className="refresh-control-group">
-              <button
-                id="refreshData"
-                className="head-btn"
-                type="button"
-                title="Reload the selected snapshot"
-                disabled={isReloading}
-                onClick={handleReloadSnapshot}
-              >
-                {isReloading ? '⟳ Syncing…' : '↻ Reload snapshot'}
-              </button>
-              <span className="refresh-build">SYNC ENGINE v4</span>
-            </div>
           </div>
         </div>
       </header>
@@ -328,165 +370,182 @@ export default function App() {
         </button>
       </div>
 
-      <main>
-        <div className="section-label">
-          SALES ANALYTICS <span className="module-count">05 VIEWS</span>
-        </div>
-        <p className="sales-analytics-description">
-          Explore sales records and trends across pricing, customer behavior, store performance, and
-          promotions through interactive dashboards.
-        </p>
+      <main className="dashboard-layout">
+        <aside className="dashboard-sidebar" aria-label="Sales Analytics">
+          <h2 className="dashboard-sidebar-title">Sales Analytics</h2>
 
-        <section className="card">
-          <strong id="sourceName">{`Offline · ${sourceName}`}</strong>
-          <details>
-            <summary>Load newer sales from Supabase</summary>
-            <p>
-              Run the query below in the project SQL Editor. Export its single result as CSV and
-              choose that file here.
-            </p>
-            <pre id="exportQuery">{SUPABASE_SNAPSHOT_SQL}</pre>
-            <input
-              id="offlineImport"
-              type="file"
-              accept=".csv,.json"
-              onChange={handleOfflineImport}
+          <nav className="tabs" aria-label="Dashboard sections" onKeyDown={handleTabsKeyDown}>
+            <button
+              ref={(el) => {
+                tabRefs.current[0] = el;
+              }}
+              className={`tab overview-tab${activeTab === 'overview' ? ' active' : ''}`}
+              id="tabOverview"
+              type="button"
+              aria-controls="overview"
+              aria-selected={activeTab === 'overview'}
+              onClick={() => setActiveTab('overview')}
+            >
+              <LayoutDashboard size={17} aria-hidden="true" /><span>Executive Dashboard</span>
+            </button>
+            <button
+              ref={(el) => {
+                tabRefs.current[1] = el;
+              }}
+              className={`tab${activeTab === '1' ? ' active' : ''}`}
+              id="tab1"
+              type="button"
+              aria-selected={activeTab === '1'}
+              onClick={() => setActiveTab('1')}
+            >
+              <TrendingUp size={17} aria-hidden="true" /><span>Premium Pricing</span>
+            </button>
+            <button
+              ref={(el) => {
+                tabRefs.current[2] = el;
+              }}
+              className={`tab${activeTab === '2' ? ' active' : ''}`}
+              id="tab2"
+              type="button"
+              aria-selected={activeTab === '2'}
+              onClick={() => setActiveTab('2')}
+            >
+              <Users size={17} aria-hidden="true" /><span>Customer Behavior</span>
+            </button>
+            <button
+              ref={(el) => {
+                tabRefs.current[3] = el;
+              }}
+              className={`tab${activeTab === '3' ? ' active' : ''}`}
+              id="tab3"
+              type="button"
+              aria-selected={activeTab === '3'}
+              onClick={() => setActiveTab('3')}
+            >
+              <Store size={17} aria-hidden="true" /><span>Store Performance</span>
+            </button>
+            <button
+              ref={(el) => {
+                tabRefs.current[4] = el;
+              }}
+              className={`tab${activeTab === '4' ? ' active' : ''}`}
+              id="tab4"
+              type="button"
+              aria-selected={activeTab === '4'}
+              onClick={() => setActiveTab('4')}
+            >
+              <Tag size={17} aria-hidden="true" /><span>Promo Analytics</span>
+            </button>
+          </nav>
+          <div className="dashboard-mining">
+            <h2 className="dashboard-sidebar-title">Data Mining</h2>
+            <button
+              type="button"
+              className="dashboard-mining-link"
+              disabled={!loadedAt}
+              onClick={() => {
+                if (activeTab === 'overview') setActiveTab('3');
+                setJumpToMining(true);
+              }}
+            >
+              <Activity size={17} aria-hidden="true" />
+              <span>Isolation Forest <small>Anomaly Detection</small></span>
+              <ArrowDown size={14} aria-hidden="true" />
+            </button>
+          </div>
+          <div className="dashboard-sidebar-footer">
+            <div className="dashboard-sidebar-data">
+              <div className="dashboard-sidebar-source">
+                <span className={loadedAt && !refreshNotice ? "data-dot connected" : "data-dot"} aria-hidden="true" />
+                {isReloading ? "Syncing sales" : refreshNotice ? "Sync unavailable" : loadedAt ? "Live Supabase" : "Awaiting data"}
+              </div>
+              {loadedAt && (
+                <>
+                  <div className="dashboard-sidebar-count">{formatNumber(snapshotRows.length)} <span>sales records</span></div>
+                  <div className="dashboard-sidebar-sync">Last loaded {loadedAt}</div>
+                </>
+              )}
+            </div>
+            <a className="dashboard-sidebar-home" href="./">Back to cover <ArrowUpRight size={15} aria-hidden="true" /></a>
+          </div>
+        </aside>
+
+        <div className="dashboard-content">
+          <div
+            id="refreshNotice"
+            className={`refresh-notice${refreshNotice ? (refreshNotice.kind ? ` ${refreshNotice.kind}` : '') : ' hidden'}`}
+            role="status"
+            aria-live="polite"
+          >
+            {refreshNotice?.message ?? ''}
+            {refreshNotice && loadedAt ? ' Showing the last successfully loaded records.' : null}
+          </div>
+
+          {!loadedAt && isReloading && <p role="status">Loading sales from Supabase…</p>}
+          {loadedAt && (activeTab === 'overview' ? (
+            <OverviewSection
+              allRows={snapshotRows}
+              filteredRows={overviewFilteredRows}
+              anomalies={overviewAnomalies}
+              skuChoices={skuChoices}
+              search={search}
+              selectedSku={selectedSku}
+              fromDate={fromDate}
+              toDate={toDate}
+              sortOrder={sortOrder}
+              grouping={overviewGroup}
+              isLight={isLight}
+              statusMessage={statusMessage}
+              statusType={statusType}
+              alertMessage={alertMessage}
+              onSearchChange={setSearch}
+              onSkuChange={setSelectedSku}
+              onFromDateChange={setFromDate}
+              onToDateChange={setToDate}
+              onSortOrderChange={setSortOrder}
+              onGroupingChange={setOverviewGroup}
+              onClearFilters={() => {
+                setSearch('');
+                setSelectedSku('');
+                setFromDate('');
+                setToDate('');
+                setSortOrder('id-desc');
+                setOverviewGroup('month');
+              }}
+              onOpenGemini={(task) => openGemini(task)}
             />
-            <p role="status" id="importMessage">
-              {importMessage}
-            </p>
-          </details>
-        </section>
+          ) : (
+            <QuestionSection
+              key={activeTab}
+              questionId={activeTab as FocusedQuestionId}
+              rows={scenarioRowsMap[activeTab as FocusedQuestionId]}
+              midtermSnapshot={midtermSnapshot}
+              salesTiming={salesTiming}
+              isReloading={isReloading}
+              onReloadRecords={handleReloadRecords}
+              totalOverviewCount={snapshotRows.length}
+              isLight={isLight}
+              statusTime={loadedAt}
+              onOpenGemini={(task) => openGemini(task)}
+            />
+          ))}
 
-        <nav className="tabs" aria-label="Dashboard sections" onKeyDown={handleTabsKeyDown}>
-          <button
-            ref={(el) => {
-              tabRefs.current[0] = el;
-            }}
-            className={`tab overview-tab${activeTab === 'overview' ? ' active' : ''}`}
-            id="tabOverview"
-            type="button"
-            aria-controls="overview"
-            aria-selected={activeTab === 'overview'}
-            onClick={() => setActiveTab('overview')}
-          >
-            ◫ &nbsp; All Sales Dashboard <span className="tab-index">00</span>
-          </button>
-          <button
-            ref={(el) => {
-              tabRefs.current[1] = el;
-            }}
-            className={`tab${activeTab === '1' ? ' active' : ''}`}
-            id="tab1"
-            type="button"
-            aria-selected={activeTab === '1'}
-            onClick={() => setActiveTab('1')}
-          >
-            ◈ &nbsp; Premium Pricing <span className="tab-index">01</span>
-          </button>
-          <button
-            ref={(el) => {
-              tabRefs.current[2] = el;
-            }}
-            className={`tab${activeTab === '2' ? ' active' : ''}`}
-            id="tab2"
-            type="button"
-            aria-selected={activeTab === '2'}
-            onClick={() => setActiveTab('2')}
-          >
-            ◎ &nbsp; Customer Behavior <span className="tab-index">02</span>
-          </button>
-          <button
-            ref={(el) => {
-              tabRefs.current[3] = el;
-            }}
-            className={`tab${activeTab === '3' ? ' active' : ''}`}
-            id="tab3"
-            type="button"
-            aria-selected={activeTab === '3'}
-            onClick={() => setActiveTab('3')}
-          >
-            ▥ &nbsp; Store Performance <span className="tab-index">03</span>
-          </button>
-          <button
-            ref={(el) => {
-              tabRefs.current[4] = el;
-            }}
-            className={`tab${activeTab === '4' ? ' active' : ''}`}
-            id="tab4"
-            type="button"
-            aria-selected={activeTab === '4'}
-            onClick={() => setActiveTab('4')}
-          >
-            ✦ &nbsp; Promo Analytics <span className="tab-index">04</span>
-          </button>
-        </nav>
-
-        <div
-          id="refreshNotice"
-          className={`refresh-notice${refreshNotice ? (refreshNotice.kind ? ` ${refreshNotice.kind}` : '') : ' hidden'}`}
-          role="status"
-          aria-live="polite"
-        >
-          {refreshNotice?.message ?? ''}
-        </div>
-
-        {activeTab === 'overview' ? (
-          <OverviewSection
-            allRows={snapshotRows}
-            filteredRows={overviewFilteredRows}
-            anomalies={overviewAnomalies}
-            skuChoices={skuChoices}
-            search={search}
-            selectedSku={selectedSku}
-            fromDate={fromDate}
-            toDate={toDate}
-            sortOrder={sortOrder}
-            grouping={overviewGroup}
-            isLight={isLight}
-            statusMessage={statusMessage}
-            statusType={statusType}
-            alertMessage={alertMessage}
-            isReloading={isReloading}
-            onSearchChange={setSearch}
-            onSkuChange={setSelectedSku}
-            onFromDateChange={setFromDate}
-            onToDateChange={setToDate}
-            onSortOrderChange={setSortOrder}
-            onGroupingChange={setOverviewGroup}
-            onClearFilters={() => {
-              setSearch('');
-              setSelectedSku('');
-              setFromDate('');
-              setToDate('');
-              setSortOrder('id-desc');
-              setOverviewGroup('month');
-            }}
-            onReloadRecords={handleReloadSnapshot}
-            onOpenGemini={(task) => openGemini(task)}
-          />
-        ) : (
-          <QuestionSection
-            key={activeTab}
-            questionId={activeTab as FocusedQuestionId}
-            rows={scenarioRowsMap[activeTab as FocusedQuestionId]}
-            midtermSnapshot={midtermSnapshot}
-            totalOverviewCount={snapshotRows.length}
-            isLight={isLight}
-            statusTime={loadedAt}
-            midtermStatusLabel={midtermFileName ? `Loaded ${midtermFileName}` : ''}
-            onMidtermLoaded={(snap, fname) => {
-              setMidtermSnapshot(snap);
-              setMidtermFileName(fname);
-            }}
-            onOpenGemini={(task) => openGemini(task)}
-          />
-        )}
-
-        <div className="footer">
-          UNIQLO SALES MANAGEMENT RECORDS • Live results depend on Supabase access
+          <div className="footer">
+            UniQlick • Live results depend on Supabase access
+          </div>
         </div>
       </main>
+
+      <button
+        id="themeToggle"
+        className="theme-launcher"
+        type="button"
+        title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+        aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+        onClick={() => setIsLight((light) => !light)}
+      >
+        {isLight ? <Moon size={22} aria-hidden="true" /> : <Sun size={22} aria-hidden="true" />}
+      </button>
 
       <GeminiModal
         isOpen={geminiOpen}

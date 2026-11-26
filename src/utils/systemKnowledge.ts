@@ -24,19 +24,19 @@ export interface QueryIntentResult {
 
 export const SYSTEM_KNOWLEDGE_SECTIONS: Record<KnowledgeSectionId, string> = {
   overview: `SYSTEM PURPOSE & OVERVIEW:
-- Application: UNIQLO Sales Management Records (Executive Sales Analytics & Gemini AI Copilot).
-- Default Dataset: Offline November 20, 2026 Midterm snapshot (1,500 sales transactions in a star schema: fact_sales joined to dim_date, dim_product, dim_promotion, dim_store, dim_employee, and dim_customer).
-- Source of Truth Rule: Whenever a user imports a CSV or JSON snapshot via the "Load newer sales from Supabase" panel, that imported dataset becomes the live source of truth across KPIs, charts, scenarios, anomaly checks, exports, and AI responses.
+- Application: UniQlick (Executive Sales Analytics & Scout).
+- Default Dataset: Live Finals sales from Supabase. The built-in November 20, 2026 snapshot contains 1,500 sales transactions for Midterm comparisons.
+- Source of Truth Rule: The latest successfully loaded Supabase records are the source of truth for all dashboard views. The saved Midterm baseline is used for comparison.
 - Currency: All monetary values use Philippine Pesos (₱, PHP) formatted with en-PH conventions.`,
 
   navigation: `NAVIGATION & UI WORKFLOWS:
 - Top Header Bar:
-  - "✦ Gemini AI": Opens the AI Copilot panel (also accessible anytime from the floating chat launcher in the bottom-right corner).
+  - "✦ Ask Scout": Opens the AI Copilot panel (also accessible anytime from the floating chat launcher in the bottom-right corner).
   - "▤ Print report": Opens browser print dialog using print-friendly CSS that automatically hides navigation tabs, toolbars, pagination, and chat overlays.
   - "☀ Light mode" / "☾ Dark mode": Toggles between dark obsidian/lime theme and high-contrast daylight theme across UI cards and Chart.js visualizations.
-  - "↻ Reload snapshot" (SYNC ENGINE v4): Re-synchronizes timestamps/status banners for the currently active snapshot.
+  - "↻ Reload records" (SYNC ENGINE v4): Fetches the latest sales from Supabase.
 - 5 Dashboard View Tabs (keyboard ArrowLeft / ArrowRight supported):
-  - "00 All Sales Dashboard": Full transaction ledger, 5 KPI cards, search/SKU/date/sort filters, 3 overview charts, Quick Insights, Data Quality & Statistical Alerts (IQR), Complete Sales Records table, CSV export.
+  - "Executive Dashboard": Full transaction ledger, 5 KPI cards, search/SKU/date/sort filters, 3 overview charts, Quick Insights, Data Quality & Statistical Alerts (IQR), Complete Sales Records table, CSV export.
   - "01 Premium Pricing": Focused Scenario Q1.
   - "02 Customer Behavior": Focused Scenario Q2.
   - "03 Store Performance": Focused Scenario Q3.
@@ -53,7 +53,7 @@ export const SYSTEM_KNOWLEDGE_SECTIONS: Record<KnowledgeSectionId, string> = {
   - Date filters ("From", "To"), "Reset filters", and "↓ Save graph" (downloads chart canvas as PNG).`,
 
   filtering_exports: `SEARCH, FILTERING, SORTING & CSV EXPORTS:
-- All Sales Dashboard ("Explore transactions" card):
+- Executive Dashboard ("Explore transactions" card):
   - "Search records": Live case-insensitive match across Sale ID, date, SKU, product name, customer name, employee ID, store code, promo code, quantity, unit price, and net sales.
   - "Product": Filters by exact SKU (e.g., UQ-UT-01, UQ-HT-02, or "All products").
   - "Start date" / "End date": Inclusive YYYY-MM-DD bounds.
@@ -64,24 +64,19 @@ export const SYSTEM_KNOWLEDGE_SECTIONS: Record<KnowledgeSectionId, string> = {
   - Scenario tables (tabs 01–04) support live search, 25/50/100 rows per page, and "↓ Export CSV".
 - Export Safety: All CSV downloads include a UTF-8 BOM and sanitize leading formula characters (=, +, -, @, tab) with csvEscape to prevent Excel/Sheets formula injection.`,
 
-  imports_midterm: `IMPORTING SNAPSHOTS, RESETTING & MIDTERM COMPARISON:
-- Importing Live/Newer Sales Records (Offline Import Panel):
-  1. Expand "Load newer sales from Supabase" below the page intro.
-  2. Copy the read-only SQL query shown in the box and run it in your Supabase SQL Editor.
-  3. Export the single-column "snapshot" query result as CSV (or JSON).
-  4. Click the file input under the SQL query and choose that .csv or .json file.
-  5. Validation checks that parsed output has matching count, unique integer sales_fact_id values, and all required fact/dimension keys. Once loaded, all views immediately switch to All Sales Dashboard using the imported file as the new source of truth.
-- Resetting: Reloading the browser page restores the built-in November 20, 2026 Midterm snapshot; "Clear filters" resets active view filters without changing loaded records; "↻ Reload snapshot" re-syncs status banners.
+  imports_midterm: `LIVE SUPABASE SALES AND MIDTERM COMPARISON:
+- The dashboard fetches live sales automatically. Use "Reload records" to retry or refresh. If the connection fails, an administrator can check the fact_sales count and read permissions in the Supabase SQL Editor.
+- Use "Clear filters" to reset the view without changing the loaded records.
 - Midterm Comparison (inside tabs 01–04):
-  - Upload a saved Midterm snapshot file ("uniqlo-exam-v1" format from SQL step 02) via "Midterm comparison · import the step 02 JSON or CSV" to render side-by-side "Saved Midterm" vs "Current database" synchronized charts plus automatic delta notes (matching row change, net sales delta, units delta, top date movers, and newly added/missing IDs).`,
+  - Open any scenario tab for synchronized "Saved Midterm" and "Finals · Live Supabase" charts. Comparison notes show changes in matching records, net sales, and units, along with the largest date contributions and new sale IDs.`,
 
   iqr_anomalies: `DATA QUALITY & STATISTICAL ALERTS (IQR / TUKEY METHOD):
-- Located in the All Sales Dashboard under "Data Quality & Statistical Alerts" (also filterable by type and exportable via "↓ Export flags CSV").
+- Located in the Executive Dashboard under "Data Quality & Statistical Alerts" (also filterable by type and exportable via "↓ Export flags CSV").
 - Statistical Outliers ("Review" severity):
   - Computed per product SKU when a product group has at least 8 filtered transactions: finds Q1 (25th percentile), Q3 (75th percentile), IQR = Q3 - Q1, and upper Tukey fence = Q3 + 1.5 × IQR. Flags transactions above the fence for "High sale value" (net_sales_collected) or "Unusual quantity" (quantity_sold).
   - Monthly Revenue Spikes ("Monthly sales spike"): Applies the same Q3 + 1.5 × IQR upper fence across monthly totals when at least 8 distinct months contain sales.
 - Integrity Warnings ("High" severity):
-  - "Date issue": Flags missing/non-8-digit date_key, mismatch between date_key and dim_date.full_date, or dates outside 2024-01-01 to 2026-09-26.
+  - "Date issue": Flags missing/non-8-digit date_key, mismatch between date_key and dim_date.full_date, or dates outside 2024-01-01 to 2026-11-25.
   - "Invalid value": Flags non-finite, negative unit price or net sales, or non-positive / non-integer quantity_sold.
 - Interpretation rule: Flags are purely read-only signals suggesting an analyst review the receipt—never proof of fraud or DB error.`,
 
@@ -101,15 +96,16 @@ export const SYSTEM_KNOWLEDGE_SECTIONS: Record<KnowledgeSectionId, string> = {
 - Average transaction (AOV): Total net sales ÷ number of transactions.
 - Average gross unit price (Scenario Q1): Sum of gross_unit_price ÷ number of records.
 - Product Revenue Distribution Doughnut: Shows top 6 SKUs by net sales plus "Other products" as share of filtered net revenue—explicitly NOT profit margins (cost/COGS, tax breakdowns, and stock inventory levels do NOT exist in this snapshot).
-- Simulated Dates Caveat: Companion SQL repair ("UNIQLO_Repair_Sales_Dates_2024_to_2026.sql") distributed synthetic dates between January 1, 2024 and September 26, 2026 (inclusive). Monthly/daily spikes reflect statistical distribution in those synthetic dates, not verified real-world historical events.
+- Simulated Dates Caveat: The exam dataset uses synthetic dates between January 1, 2024 and November 25, 2026 (inclusive). Monthly/daily spikes reflect statistical distribution in those synthetic dates, not verified real-world historical events.
 - Active Filter vs Overall Dataset: Always check both active filtered KPIs and overall loaded KPIs before answering so filtered subset counts are never confused with total loaded snapshot counts.`,
 
-  copilot: `UNIQLO SALES ASSISTANT CAPABILITIES & PRIVACY:
-- Accessible via the bottom-right "Sales Assistant" launcher button, the top-right "✦ Gemini AI" button, or inline "✦ Explain flags with Gemini" / "✦ Ask Gemini AI" buttons inside cards.
+  copilot: `Scout CAPABILITIES & PRIVACY:
+- Accessible via the bottom-right "Open Scout" launcher button, the top-right "✦ Ask Scout" button, or inline "✦ Explain flags with Groq" / "✦ Ask Scout" buttons inside cards.
 - Supports two integrated workflows:
   1. Chat: Multi-turn SSE-streaming Q&A in English, Filipino, or Taglish with persistent conversation history, suggested questions, Minimize/Reopen/Close controls, and Clear.
   2. Briefings: "✦ Executive Briefing", "✦ Explain Anomalies & ML", and "✦ Deep-Dive Slice" return schema-validated JSON insights grounded in the active view.
-- Security & Read-Only Boundary: All Gemini API calls run exclusively on the Express backend using process.env.GEMINI_API_KEY. Chat responses cannot read external databases directly or modify database tables.`,
+- Sales record lookup: Scout runs read-only Supabase lookups for filter questions and shows exact matching records, a total, and the applied filters. Supported fields include customer, SKU, product name, employee, store, promotion, gross unit price, net sales, quantity, sale ID, and date. Use AND, OR, and parentheses to combine conditions. Follow up with a phrase such as "And only in 2025" to refine the previous lookup.
+- Security & Read-Only Boundary: General AI chat and structured briefings use Groq through Express. The live record lookup uses validated filters and the dashboard's existing database read policies. The assistant cannot modify database tables.`,
 };
 
 const ALL_SECTIONS: KnowledgeSectionId[] = Object.keys(
