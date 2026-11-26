@@ -1,4 +1,4 @@
-import { Activity, Columns2, ArrowUpRight, LayoutDashboard, Moon, Printer, Store, Sun, Tag, TrendingUp, Users } from 'lucide-react';
+import { Activity, Columns2, Database, ArrowUpRight, LayoutDashboard, Moon, Printer, Store, Sun, Tag, TrendingUp, Users } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import rawMidtermRows from './data/offlineSales.json';
 import type {
@@ -23,6 +23,7 @@ import { computeIsolationForest } from './utils/isolationForest.ts';
 import { parseImportedSnapshot } from './utils/snapshotParser.ts';
 import { MidtermComparison } from './components/MidtermComparison.tsx';
 import { OverviewSection } from './components/OverviewSection.tsx';
+import { WarehouseSchema } from './components/WarehouseSchema.tsx';
 import { QuestionSection } from './components/QuestionSection.tsx';
 import { GeminiModal } from './components/GeminiModal.tsx';
 
@@ -65,7 +66,10 @@ export default function App() {
 
 function Dashboard() {
   const [snapshotRows, setSnapshotRows] = useState<SalesRecord[]>([]);
-  const [activeTab, setActiveTab] = useState<ScenarioId | 'comparison' | 'mining'>(new URLSearchParams(window.location.search).get('view') === 'comparison' ? 'comparison' : 'overview');
+  const [activeTab, setActiveTab] = useState<ScenarioId | 'comparison' | 'mining' | 'schema'>(() => {
+    const view = new URLSearchParams(window.location.search).get('view');
+    return view === 'comparison' || view === 'schema' ? view : 'overview';
+  });
   const [miningQuestion, setMiningQuestion] = useState<FocusedQuestionId>('3');
   const [isLight, setIsLight] = useState<boolean>(true);
   const [loadedAt, setLoadedAt] = useState('');
@@ -169,7 +173,7 @@ function Dashboard() {
   }, [snapshotRows, loadedAt, sourceName]);
 
   const llmContextPayload = useMemo(() => {
-    if (activeTab === 'overview' || activeTab === 'comparison') {
+    if (activeTab === 'overview' || activeTab === 'comparison' || activeTab === 'schema') {
       const parts: string[] = [];
       if (selectedSku) parts.push(`SKU=${selectedSku}`);
       if (fromDate || toDate) parts.push(`Dates=${fromDate || 'start'}..${toDate || 'end'}`);
@@ -283,7 +287,7 @@ function Dashboard() {
   };
 
   const focusedQuestion = activeTab === 'mining' ? miningQuestion : activeTab as FocusedQuestionId;
-  const tabOrder: (ScenarioId | 'comparison' | 'mining')[] = ['overview', '1', '2', '3', '4', 'comparison'];
+  const tabOrder: (ScenarioId | 'comparison' | 'mining' | 'schema')[] = ['overview', '1', '2', '3', '4', 'comparison', 'schema'];
 
   const handleTabsKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     const next = e.key === 'ArrowRight' || e.key === 'ArrowDown';
@@ -435,6 +439,11 @@ function Dashboard() {
               aria-selected={activeTab === 'comparison'} onClick={() => setActiveTab('comparison')}>
               <Columns2 size={17} aria-hidden="true" /><span>Comparative Analysis</span>
             </button>
+            <button type="button" ref={el => { tabRefs.current[6] = el; }}
+              className={activeTab === 'schema' ? 'tab active' : 'tab'}
+              aria-selected={activeTab === 'schema'} onClick={() => setActiveTab('schema')}>
+              <Database size={17} aria-hidden="true" /><span>Warehouse Schema</span>
+            </button>
           </nav>
 
           <div className="dashboard-mining">
@@ -479,7 +488,8 @@ function Dashboard() {
           </div>
 
           {!loadedAt && isReloading && <p role="status">Loading sales from Supabase…</p>}
-          {loadedAt && (activeTab === 'comparison' ? <MidtermComparison midtermSnapshot={midtermSnapshot} midterm={midtermRows} finals={snapshotRows} isLight={isLight} salesTiming={salesTiming} isReloading={isReloading} onReloadRecords={handleReloadRecords} statusTime={loadedAt} onOpenGemini={openGemini} /> : activeTab === 'overview' ? (
+          {activeTab === 'schema' && <WarehouseSchema />}
+          {loadedAt && activeTab !== 'schema' && (activeTab === 'comparison' ? <MidtermComparison midtermSnapshot={midtermSnapshot} midterm={midtermRows} finals={snapshotRows} isLight={isLight} salesTiming={salesTiming} isReloading={isReloading} onReloadRecords={handleReloadRecords} statusTime={loadedAt} onOpenGemini={openGemini} /> : activeTab === 'overview' ? (
             <OverviewSection
               allRows={snapshotRows}
               filteredRows={overviewFilteredRows}

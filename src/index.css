@@ -1059,3 +1059,14 @@ body.light .overview-hero .overview-eyebrow { color: #ffb2bb; }
 .exam-comparison p { margin: 6px 0 16px; color: var(--muted); }
 .exam-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
 .exam-grid article { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: clamp(12px, 2vw, 24px); }
+
+.warehouse-schema > p, .warehouse-schema article p { color: var(--muted); }
+.warehouse-schema h3 { display: flex; align-items: center; gap: 8px; }
+.warehouse-fact { border-color: var(--accent); }
+.warehouse-dimensions { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+.warehouse-dimensions .card { margin: 0; scroll-margin-top: 1rem; }
+.warehouse-dimensions .card:target { border-color: var(--accent); }
+.warehouse-join { font-size: 12px; overflow-wrap: anywhere; }
+.warehouse-fields { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 12px 0 0; }
+.warehouse-fields li { font-size: 12px; padding: 4px 7px; border-radius: 5px; border: 1px solid var(--line); background: var(--panel2); overflow-wrap: anywhere; }
+.warehouse-fields strong, .warehouse-fields a { color: var(--accent); }
