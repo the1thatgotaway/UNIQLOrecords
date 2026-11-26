@@ -1052,3 +1052,12 @@ body.light .overview-hero .overview-eyebrow { color: #ffb2bb; }
 .dashboard-mining-link:disabled { opacity: .6; cursor: default; }
 .ai-question-card { scroll-margin-top: 20px; }
 @media print { .dashboard-mining { display: none; } }
+
+.exam-comparison p { margin: 6px 0 16px; color: var(--muted); }
+.exam-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr)); }
+.exam-grid article { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: clamp(12px, 2vw, 24px); }
+.exam-trend { position: relative; height: 210px; margin-bottom: 16px; }
+.exam-metrics { overflow-x: auto; }
+.exam-metrics table { min-width: 0; width: 100%; font-variant-numeric: tabular-nums; }
+.exam-metrics :is(th,td) { position: static; padding: 7px 4px; text-align: right; font-size: 12px; }
+.exam-metrics th:first-child { text-align: left; }
