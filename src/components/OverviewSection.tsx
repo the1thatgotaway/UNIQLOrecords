@@ -359,12 +359,13 @@ export function OverviewSection({
       <div className="card full-dash-title overview-intro">
         <div>
           <span className="overview-eyebrow">Executive Dashboard</span>
-          <h2 id="overviewHeading">UNIQLO Retail Sales Overview</h2>
+          <h2 id="overviewHeading">UniQlick Retail Sales Analytics</h2>
           <p>
-            <strong>UNIQLO</strong> is a Japanese apparel retailer built around LifeWear, its approach to practical clothing for everyday life. Its product lines include HEATTECH and AIRism.
-          </p>
-          <p>
-            <strong>UniQlick</strong> is a sales analytics project that uses a simulated UNIQLO retail dataset. Review net sales and units sold by product and store, see which purchases were made under promotions, and open the transactions behind a change in sales.
+            Welcome to <strong>UniQlick</strong>, a centralized platform for retail sales reporting and analysis.
+            It brings sales transactions together with product, customer, store, employee, and promotion data,
+            giving users a clear view of what sold, where it sold, and how sales changed over time. Through
+            interactive dashboards, users can track net sales and units sold, compare performance across retail
+            scenarios, and examine the individual transactions behind unusual sales patterns.
           </p>
         </div>
         <div className="full-dash-actions">
