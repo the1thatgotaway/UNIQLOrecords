@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Database, Link2, X } from 'lucide-react';
 
 const dimensions = [
@@ -11,6 +11,7 @@ const dimensions = [
 ];
 
 export function WarehouseSchema({ onClose }: { onClose: () => void }) {
+  const [section, setSection] = useState<'diagram' | 'tables'>('diagram');
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => { dialog.current?.showModal(); }, []);
 
@@ -21,8 +22,18 @@ export function WarehouseSchema({ onClose }: { onClose: () => void }) {
         <h2 id="warehouse-title">UniQlick Data Warehouse Schema</h2>
         <button type="button" className="action-btn" aria-label="Close schema" onClick={() => dialog.current?.close()}><X size={18} /></button>
       </div>
-      <div className="warehouse-dialog-body">
+      <div className="warehouse-view-switch" role="group" aria-label="Warehouse view">
+        <button type="button" className="action-btn" aria-pressed={section === 'diagram'} onClick={() => setSection('diagram')}>
+          Schema diagram
+        </button>
+        <button type="button" className="action-btn" aria-pressed={section === 'tables'} onClick={() => setSection('tables')}>
+          Warehouse tables
+        </button>
+      </div>
+      <div className="warehouse-dialog-body" id="warehouse-diagram-panel" hidden={section !== 'diagram'}>
         <img className="warehouse-diagram" src="/assets/warehouse-schema.png?v=2" width={1160} height={811} alt="Star schema showing fact_sales linked to the date, product, store, employee, customer, and promotion dimensions" />
+      </div>
+      <div className="warehouse-dialog-body" hidden={section !== 'tables'}>
         <h3 className="warehouse-tables-title">Warehouse Tables</h3>
         <p>Six dimension tables describe each sale in <code>public.fact_sales</code>. Each foreign key links to the matching dimension’s primary key.</p>
         <article className="card warehouse-fact">

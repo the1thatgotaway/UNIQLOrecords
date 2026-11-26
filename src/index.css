@@ -1172,3 +1172,10 @@ body.light .dashboard-header {
   outline: 2px solid white;
   outline-offset: 3px;
 }
+
+.warehouse-view-switch { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px clamp(14px, 3vw, 28px); border-bottom: 1px solid var(--line); }
+.warehouse-view-switch button[aria-pressed="true"] { background: var(--accent); color: var(--panel); }
+.warehouse-dialog[open] { display: flex; flex-direction: column; overflow: hidden; }
+.warehouse-dialog-body { min-height: 0; overflow: auto; }
+.warehouse-dialog-body[hidden] { display: none; }
+.warehouse-dialog-heading, .warehouse-view-switch, .warehouse-dialog-footer { flex-shrink: 0; }
