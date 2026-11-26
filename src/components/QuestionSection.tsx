@@ -33,6 +33,7 @@ import { buildCsvDocument } from '../utils/snapshotParser.ts';
 import { ChartCanvas } from './ChartCanvas.tsx';
 
 interface QuestionSectionProps {
+  comparisonOnly?: boolean;
   questionId: FocusedQuestionId;
   rows: SalesRecord[];
   midtermSnapshot: Pick<MidtermSnapshot, 'captured_at' | 'baseline' | 'scenarios'>;
@@ -92,6 +93,7 @@ function downloadFile(content: string, filename: string) {
 }
 
 export function QuestionSection({
+  comparisonOnly = false,
   questionId,
   rows,
   midtermSnapshot,
@@ -598,6 +600,77 @@ export function QuestionSection({
     downloadFile(buildCsvDocument(headers, body), `uniqlick-question-${questionId}-sales.csv`);
   };
 
+  const comparisonPanel = (
+    <>
+      <h3>Midterm vs. Finals comparison</h3>
+
+      <div className="exam-pair">
+        <div id={`midPane${questionId}`}>
+          <h3>Saved Midterm</h3>
+          <ChartCanvas
+            id={`midChart${questionId}`}
+            containerClassName="chart-container"
+            config={midtermConfig}
+            onFirstRender={recordMidtermRender}
+            plugins={activePlugins}
+            ariaLabel={`Saved Midterm Question ${questionId} chart`}
+            isLight={isLight}
+          />
+        </div>
+        <div>
+          <h3 id={`currentLabel${questionId}`} hidden={!midtermConfig}>
+            Finals · Live Supabase
+          </h3>
+          <ChartCanvas
+            id={qNum === 2 ? 'chart2a' : `chart${questionId}`}
+            containerClassName="chart-container"
+            config={primaryConfig}
+            plugins={activePlugins}
+            ariaLabel={`Question ${questionId} studio chart`}
+            isLight={isLight}
+            onCanvasReady={savePrimaryCanvas}
+            onFirstRender={recordFinalsRender}
+          />
+        </div>
+      </div>
+
+      <details className="comparison-timing">
+        <summary>Comparison timings</summary>
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr><th scope="col">Measurement</th><th scope="col">Saved Midterm</th><th scope="col">Live Finals</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Supabase retrieval</th><td>Bundled data</td><td>{formatTiming(salesTiming?.supabaseMs)}</td></tr>
+              <tr><th scope="row">Browser data request</th><td>Bundled data</td><td>{formatTiming(salesTiming?.requestMs)}</td></tr>
+              <tr>
+                <th scope="row">Chart render</th>
+                <td>{formatTiming(midtermRender?.config === midtermConfig ? midtermRender.ms : null)}</td>
+                <td>{formatTiming(finalsRender?.config === primaryConfig ? finalsRender.ms : null)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="description">
+          All four scenarios share one paginated Supabase load. Chart times measure each chart
+          separately through its first completed draw, including animation.
+        </p>
+        <button type="button" className="action-btn" disabled={isReloading} onClick={onReloadRecords}>
+          {isReloading ? 'Refreshing live data…' : 'Refresh live data and timings'}
+        </button>
+      </details>
+
+      <div id={`compareNotes${questionId}`} aria-live="polite">
+        {compareNotes.map((msg, idx) => (
+          <p key={idx}>{msg}</p>
+        ))}
+      </div>
+    </>
+  );
+
+  if (comparisonOnly) return comparisonPanel;
+
   return (
     <section id={`question${questionId}`}>
       <div className="card question-heading">
@@ -805,70 +878,7 @@ export function QuestionSection({
           {qNum === 4 && (
             <p className="description">Daily net sales for UQ-BAG-01 under PROMO-LIMITED.</p>
           )}
-          <h3>Midterm vs. Finals comparison</h3>
-
-          <div className="exam-pair">
-            <div id={`midPane${questionId}`}>
-              <h3>Saved Midterm</h3>
-              <ChartCanvas
-                id={`midChart${questionId}`}
-                containerClassName="chart-container"
-                config={midtermConfig}
-                onFirstRender={recordMidtermRender}
-                plugins={activePlugins}
-                ariaLabel={`Saved Midterm Question ${questionId} chart`}
-                isLight={isLight}
-              />
-            </div>
-            <div>
-              <h3 id={`currentLabel${questionId}`} hidden={!midtermConfig}>
-                Finals · Live Supabase
-              </h3>
-              <ChartCanvas
-                id={qNum === 2 ? 'chart2a' : `chart${questionId}`}
-                containerClassName="chart-container"
-                config={primaryConfig}
-                plugins={activePlugins}
-                ariaLabel={`Question ${questionId} studio chart`}
-                isLight={isLight}
-                onCanvasReady={savePrimaryCanvas}
-                onFirstRender={recordFinalsRender}
-              />
-            </div>
-          </div>
-
-          <details className="comparison-timing">
-            <summary>Comparison timings</summary>
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr><th scope="col">Measurement</th><th scope="col">Saved Midterm</th><th scope="col">Live Finals</th></tr>
-                </thead>
-                <tbody>
-                  <tr><th scope="row">Supabase retrieval</th><td>Bundled data</td><td>{formatTiming(salesTiming?.supabaseMs)}</td></tr>
-                  <tr><th scope="row">Browser data request</th><td>Bundled data</td><td>{formatTiming(salesTiming?.requestMs)}</td></tr>
-                  <tr>
-                    <th scope="row">Chart render</th>
-                    <td>{formatTiming(midtermRender?.config === midtermConfig ? midtermRender.ms : null)}</td>
-                    <td>{formatTiming(finalsRender?.config === primaryConfig ? finalsRender.ms : null)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p className="description">
-              All four scenarios share one paginated Supabase load. Chart times measure each chart
-              separately through its first completed draw, including animation.
-            </p>
-            <button type="button" className="action-btn" disabled={isReloading} onClick={onReloadRecords}>
-              {isReloading ? 'Refreshing live data…' : 'Refresh live data and timings'}
-            </button>
-          </details>
-
-          <div id={`compareNotes${questionId}`} aria-live="polite">
-            {compareNotes.map((msg, idx) => (
-              <p key={idx}>{msg}</p>
-            ))}
-          </div>
+          {comparisonPanel}
         </div>
 
         <div className="card interpretation-card" aria-live="polite">

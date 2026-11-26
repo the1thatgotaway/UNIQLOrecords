@@ -489,7 +489,7 @@ function Dashboard() {
           </div>
 
           {!loadedAt && isReloading && <p role="status">Loading sales from Supabase…</p>}
-          {loadedAt && (activeTab === 'comparison' ? <MidtermComparison midterm={midtermRows} finals={snapshotRows} isLight={isLight} /> : activeTab === 'overview' ? (
+          {loadedAt && (activeTab === 'comparison' ? <MidtermComparison midtermSnapshot={midtermSnapshot} midterm={midtermRows} finals={snapshotRows} isLight={isLight} salesTiming={salesTiming} isReloading={isReloading} onReloadRecords={handleReloadRecords} statusTime={loadedAt} onOpenGemini={openGemini} /> : activeTab === 'overview' ? (
             <OverviewSection
               allRows={snapshotRows}
               filteredRows={overviewFilteredRows}
