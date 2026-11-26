@@ -1,4 +1,4 @@
-import { ArrowUp, Maximize2, MessageCircle, Minimize2, Minus, RotateCcw, X } from 'lucide-react';
+import { ArrowUp, MessageCircle, Minus, RotateCcw, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   LlmAnalysisResult,
@@ -27,6 +27,13 @@ interface GeminiModalProps {
 }
 
 type CopilotMode = 'chat' | 'briefing';
+
+const SCENARIO_QUESTIONS = [
+  ['Premium Pricing', 'Show sales records for UQ-HT-02 with gross unit price greater than 1000.'],
+  ['Customer Behavior', 'Show sales records for customer Benjamin Aquino and product UQ-AIR-01.'],
+  ['Store Performance', 'Show sales records for employee EMP-003 and store STORE-003.'],
+  ['Promo Analytics', 'Show sales records from 2024-03 for product UQ-BAG-01 and promotion PROMO-LIMITED.'],
+] as const;
 
 const SUGGESTED_QUESTIONS = [
   'How do I use this system?',
@@ -71,7 +78,6 @@ export function GeminiModal({
   const [error, setError] = useState('');
   const [minimized, setMinimized] = useState(false);
   const [suggestionsExpanded, setSuggestionsExpanded] = useState<boolean | null>(null);
-  const [wide, setWide] = useState(false);
   const showSuggestions = suggestionsExpanded ?? messages.length === 0;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -362,7 +368,7 @@ export function GeminiModal({
       {isOpen && !minimized && (
         <dialog
           ref={dialogRef}
-          className={`chatbot-panel${wide ? ' chatbot-panel-wide' : ''}`}
+          className="chatbot-panel chatbot-panel-wide"
           onCancel={(event) => {
             event.preventDefault();
             handleClose();
@@ -395,15 +401,6 @@ export function GeminiModal({
                 aria-label="Clear saved conversation"
               >
                 <RotateCcw size={15} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="llm-icon-btn llm-width-btn"
-                onClick={() => setWide((expanded) => !expanded)}
-                title={wide ? 'Restore panel width' : 'Expand panel for sales tables'}
-                aria-label={wide ? 'Restore panel width' : 'Expand panel for sales tables'}
-              >
-                {wide ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
               </button>
               <button
                 type="button"
@@ -572,6 +569,19 @@ export function GeminiModal({
                     <p>Find sales records or ask about trends, dashboard views, and anomalies in English, Filipino, or Taglish.</p>
                   </div>
                 )}
+
+                <details className="llm-scenario-questions" open={messages.length === 0}>
+                  <summary>Quick Sales Questions</summary>
+                  <div className="llm-scenario-grid">
+                    {SCENARIO_QUESTIONS.map(([title, question]) => (
+                      <button type="button" className="llm-chip" key={title}
+                        disabled={streaming || checkingSales} onClick={() => sendQuestion(question)}>
+                        <strong>{title}</strong>
+                        <span>{question}</span>
+                      </button>
+                    ))}
+                  </div>
+                </details>
 
                 <div className="llm-suggestions-wrap">
                   <div className="llm-suggestions-head">
