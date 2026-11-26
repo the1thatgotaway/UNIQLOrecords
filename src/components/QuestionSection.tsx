@@ -273,6 +273,21 @@ export function QuestionSection({
       };
     }
 
+    const sharedOpts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: viewMode === 'mix', labels: { color: tickColor } },
+        tooltip: { mode: 'index' as const, intersect: false },
+      },
+      scales: baseScales,
+    };
+
+    if (!comparisonOnly) {
+      const liveConfig = { type: chartType, data: { labels, datasets }, options: sharedOpts } as ChartConfiguration;
+      return { primaryConfig: liveConfig, midtermConfig: liveConfig, compareNotes: [] };
+    }
+
     const before = midtermSnapshot.scenarios[questionId].filter((row) => {
       const d = dateOf(row);
       return (!fromDate || d >= fromDate) && (!toDate || d <= toDate);
@@ -410,15 +425,7 @@ export function QuestionSection({
         : []),
     ];
 
-    const sharedOpts = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: viewMode === 'mix', labels: { color: tickColor } },
-        tooltip: { mode: 'index' as const, intersect: false },
-      },
-      scales: baseScales,
-    };
+
 
     return {
       primaryConfig: {
@@ -434,6 +441,7 @@ export function QuestionSection({
       compareNotes: notes,
     };
   }, [
+    comparisonOnly,
     groups,
     viewMode,
     metricTitle,
@@ -878,7 +886,14 @@ export function QuestionSection({
           {qNum === 4 && (
             <p className="description">Daily net sales for UQ-BAG-01 under PROMO-LIMITED.</p>
           )}
-          {comparisonPanel}
+          <ChartCanvas
+            id={qNum === 2 ? 'chart2a' : `chart${questionId}`}
+            config={primaryConfig}
+            plugins={activePlugins}
+            ariaLabel={`Question ${questionId} studio chart`}
+            isLight={isLight}
+            onCanvasReady={savePrimaryCanvas}
+          />
         </div>
 
         <div className="card interpretation-card" aria-live="polite">
