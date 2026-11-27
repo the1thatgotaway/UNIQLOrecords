@@ -869,7 +869,7 @@ export function QuestionSection({
 
   if (miningOnly) return <>
     {miningPanel}
-    <TukeyChart groups={groups} period={periodNoun} isLight={isLight} />
+    <TukeyChart groups={groups} rows={filteredChartRows} grouping={grouping} period={periodNoun} isLight={isLight} />
   </>;
 
   return (
