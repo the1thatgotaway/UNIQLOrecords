@@ -27,7 +27,7 @@ import { WarehouseSchema } from './components/WarehouseSchema.tsx';
 import { QuestionSection } from './components/QuestionSection.tsx';
 import { GeminiModal } from './components/GeminiModal.tsx';
 
-const sourceName = 'Live Supabase';
+const liveSource = 'Live Supabase';
 const midtermLabel = 'November 20, 2026 Midterm snapshot';
 const midtermRows = rawMidtermRows as SalesRecord[];
 const midtermSnapshot: Pick<MidtermSnapshot, 'captured_at' | 'baseline' | 'scenarios'> = {
@@ -91,6 +91,8 @@ function CoverPage() {
 }
 
 function Dashboard() {
+  const [sourceName, setSourceName] = useState(liveSource);
+  const hasSales = useRef(false);
   const [snapshotRows, setSnapshotRows] = useState<SalesRecord[]>([]);
   const [schemaOpen, setSchemaOpen] = useState(() => new URLSearchParams(window.location.search).get('view') === 'schema');
   const [activeTab, setActiveTab] = useState<ScenarioId | 'comparison' | 'mining'>(() => {
@@ -285,6 +287,8 @@ function Dashboard() {
       const snapshot = parseImportedSnapshot(data);
       const supabaseDuration = response.headers.get('Server-Timing')?.match(/supabase;dur=([\d.]+)/)?.[1];
       setSalesTiming({ requestMs, supabaseMs: supabaseDuration ? Number(supabaseDuration) : null });
+      hasSales.current = true;
+      setSourceName(liveSource);
       setSnapshotRows(snapshot.rows);
       setLoadedAt(new Date().toLocaleTimeString('en-PH'));
       setRefreshNotice(null);
@@ -296,6 +300,23 @@ function Dashboard() {
         });
       }
     } catch (err) {
+      if (!signal?.aborted && !hasSales.current) {
+        try {
+          const backup = await fetch('/assets/finals-sales-snapshot.json', { signal });
+          if (!backup.ok) throw new Error('Saved snapshot unavailable');
+          const snapshot = parseImportedSnapshot(await backup.text());
+          if (signal?.aborted) return;
+          hasSales.current = true;
+          setSourceName('Saved Finals snapshot');
+          setSnapshotRows(snapshot.rows);
+          setLoadedAt(new Date().toLocaleTimeString('en-PH'));
+          setSalesTiming(null);
+          setRefreshNotice({ message: 'Live sales are unavailable.', kind: 'warning' });
+          return;
+        } catch {
+          // Report the original live load error if the snapshot cannot load.
+        }
+      }
       if (!signal?.aborted) {
         setRefreshNotice({
           message: err instanceof Error ? err.message : 'Could not load live sales.',
@@ -512,7 +533,7 @@ function Dashboard() {
             <div className="dashboard-sidebar-data">
               <div className="dashboard-sidebar-source">
                 <span className={loadedAt && !refreshNotice ? "data-dot connected" : "data-dot"} aria-hidden="true" />
-                {isReloading ? "Syncing sales" : refreshNotice ? "Sync unavailable" : loadedAt ? "Live Supabase" : "Awaiting data"}
+                {isReloading ? "Syncing sales" : loadedAt ? sourceName : refreshNotice ? "Sync unavailable" : "Awaiting data"}
               </div>
               {loadedAt && (
                 <>
@@ -533,12 +554,12 @@ function Dashboard() {
             aria-live="polite"
           >
             {refreshNotice?.message ?? ''}
-            {refreshNotice && loadedAt ? ' Showing the last successfully loaded records.' : null}
+            {refreshNotice && loadedAt ? sourceName === liveSource ? ' Showing the last successfully loaded records.' : ' Showing the saved 6,500-record Finals snapshot.' : null}
           </div>
 
           {!loadedAt && isReloading && <p role="status">Loading sales from Supabase…</p>}
           {schemaOpen && <WarehouseSchema onClose={() => setSchemaOpen(false)} />}
-          {loadedAt && (activeTab === 'comparison' ? <MidtermComparison midtermSnapshot={midtermSnapshot} midterm={midtermRows} finals={snapshotRows} isLight={isLight} salesTiming={salesTiming} isReloading={isReloading} onReloadRecords={handleReloadRecords} statusTime={loadedAt} onOpenGemini={openGemini} /> : activeTab === 'overview' ? (
+          {loadedAt && (activeTab === 'comparison' ? <MidtermComparison midtermSnapshot={midtermSnapshot} midterm={midtermRows} finals={snapshotRows} isLight={isLight} salesTiming={salesTiming} isReloading={isReloading} onReloadRecords={handleReloadRecords} statusTime={loadedAt} salesSource={sourceName} onOpenGemini={openGemini} /> : activeTab === 'overview' ? (
             <OverviewSection
               allRows={snapshotRows}
               filteredRows={overviewFilteredRows}
@@ -595,6 +616,7 @@ function Dashboard() {
               totalOverviewCount={snapshotRows.length}
               isLight={isLight}
               statusTime={loadedAt}
+              salesSource={sourceName}
               onOpenGemini={(task) => openGemini(task)}
             />
             </>

@@ -42,6 +42,7 @@ interface QuestionSectionProps {
   totalOverviewCount: number;
   isLight: boolean;
   statusTime: string;
+  salesSource?: string;
   salesTiming: { requestMs: number; supabaseMs: number | null } | null;
   isReloading: boolean;
   onReloadRecords: () => void;
@@ -103,6 +104,7 @@ export function QuestionSection({
   totalOverviewCount,
   isLight,
   statusTime,
+  salesSource = 'Live Supabase',
   salesTiming,
   isReloading,
   onReloadRecords,
@@ -908,7 +910,7 @@ export function QuestionSection({
       </div>
 
       <div id={`status${questionId}`} className="status success" role="status" aria-live="polite">
-        {`Loaded ${formatNumber(rows.length)} matching records from Live Supabase · ${statusTime}`}
+        {`Loaded ${formatNumber(rows.length)} matching records from ${salesSource} · ${statusTime}`}
       </div>
 
       <div id={`summary${questionId}`} className="summary-grid">
