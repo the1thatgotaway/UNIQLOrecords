@@ -617,20 +617,20 @@ export function QuestionSection({
 
       <div className="exam-pair">
         <div id={`midPane${questionId}`}>
-          <h3>Saved Midterm</h3>
+          <h3>Midterm</h3>
           <ChartCanvas
             id={`midChart${questionId}`}
             containerClassName="chart-container"
             config={midtermConfig}
             onFirstRender={recordMidtermRender}
             plugins={activePlugins}
-            ariaLabel={`Saved Midterm Question ${questionId} chart`}
+            ariaLabel={`Midterm Question ${questionId} chart`}
             isLight={isLight}
           />
         </div>
         <div>
           <h3 id={`currentLabel${questionId}`} hidden={!midtermConfig}>
-            Finals · Live Supabase
+            Finals
           </h3>
           <ChartCanvas
             id={qNum === 2 ? 'chart2a' : `chart${questionId}`}
@@ -650,7 +650,7 @@ export function QuestionSection({
         <div className="table-wrapper">
           <table>
             <thead>
-              <tr><th scope="col">Measurement</th><th scope="col">Saved Midterm</th><th scope="col">Live Finals</th></tr>
+              <tr><th scope="col">Measurement</th><th scope="col">Midterm</th><th scope="col">Finals</th></tr>
             </thead>
             <tbody>
               <tr><th scope="row">Supabase retrieval</th><td>Bundled data</td><td>{formatTiming(salesTiming?.supabaseMs)}</td></tr>
