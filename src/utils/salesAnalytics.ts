@@ -237,13 +237,17 @@ function quantile(sorted: number[], p: number): number {
   return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
 }
 
-export function upperFence(values: number[]): number | null {
+export function tukeySummary(values: number[]) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
   if (sorted.length < 8) return null;
   const q1 = quantile(sorted, 0.25);
   const q3 = quantile(sorted, 0.75);
   const iqr = q3 - q1;
-  return iqr > 0 ? q3 + 1.5 * iqr : null;
+  return iqr > 0 ? { q1, q3, iqr, upper: q3 + 1.5 * iqr } : null;
+}
+
+export function upperFence(values: number[]): number | null {
+  return tukeySummary(values)?.upper ?? null;
 }
 
 export function detectSalesAnomalies(rows: SalesRecord[]): AnomalyFlag[] {

@@ -31,6 +31,7 @@ import {
   explainTrendSummary,
 } from '../utils/isolationForest.ts';
 import { buildCsvDocument } from '../utils/snapshotParser.ts';
+import { TukeyChart } from './TukeyChart.tsx';
 import { ChartCanvas } from './ChartCanvas.tsx';
 
 interface QuestionSectionProps {
@@ -866,7 +867,10 @@ export function QuestionSection({
     </div>
   );
 
-  if (miningOnly) return miningPanel;
+  if (miningOnly) return <>
+    {miningPanel}
+    <TukeyChart groups={groups} period={periodNoun} isLight={isLight} />
+  </>;
 
   return (
     <section id={`question${questionId}`}>
