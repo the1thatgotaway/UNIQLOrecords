@@ -613,7 +613,6 @@ export function QuestionSection({
 
   const comparisonPanel = (
     <>
-      <h3>Midterm vs. Finals comparison</h3>
 
       <div className="exam-pair">
         <div id={`midPane${questionId}`}>
