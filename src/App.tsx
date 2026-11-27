@@ -578,7 +578,7 @@ function Dashboard() {
                   <select id="miningQuestion" value={miningQuestion}
                     onChange={event => setMiningQuestion(event.target.value as FocusedQuestionId)}>
                     {(['1', '2', '3', '4'] as const).map(id => (
-                      <option key={id} value={id}>{SCENARIO_META[id].title}</option>
+                      <option key={id} value={id}>{SCENARIO_META[id].title.replace(/^Question [0-9]+: /, '')}</option>
                     ))}
                   </select>
                 </div>
